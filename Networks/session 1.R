@@ -1,5 +1,5 @@
-install.packages("igraph")
-install.packages("igraphdata")
+# install.packages("igraph")
+# install.packages("igraphdata")
 library(igraph)
 library(igraphdata)
 # data(package="igraphdata") список встроенных датасетов
@@ -55,7 +55,7 @@ plot()
 nodes <- read.csv("Dataset1-Media-Example-NODES.csv", header=T) 
 links <- read.csv("Dataset1-Media-Example-EDGES.csv", header=T)
 net <- graph_from_data_frame(d=links, vertices=nodes, directed=T)
-plot(net)
+plot(net, edge.arrow_size=.001)
 # упростим граф, уберем петли, а повторные ребра суммируем через edge.attr.comb
 net_s <- simplify(net, remove.multiple = T, remove.loops = T, edge.attr.comb=c(weight="sum", type="ignore") )
 plot(net_s, edge.arrow.size=.4, vertex.label=NA, vertex.size = V(net)$audience.size/4) # можно было создать характеристику V(net_s)$size <- V(net)$audience.size/4 
@@ -67,6 +67,8 @@ M <- get.adjacency(net)
 M <- as_adjacency_matrix(net, attr = "weight") # суммируем вес ребер в матрице смежности
 M <- as.matrix(M)
 net_M <- graph_from_adjacency_matrix(M)
+net_M
+M
 
 # возьмем готовые данные и визуализируем красиво: ?igraph.plotting
 data(karate) # загружаем встроенный набор из пакета igraphdata
