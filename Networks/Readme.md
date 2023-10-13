@@ -3,7 +3,7 @@
 Что нужно сделать:
 - [ ] Задание 1:
 	- [x] выбрать датасет
-	- [ ] прочитать [https://www.researchgate.net/publication/319552932_Analysing_Scientific_Collaborations_of_New_Zealand_Institutions_using_Scopus_Bibliometric_Data](статью) по выбранному датасету
+	- [ ] прочитать [статью](https://www.researchgate.net/publication/319552932_Analysing_Scientific_Collaborations_of_New_Zealand_Institutions_using_Scopus_Bibliometric_Data) по выбранному датасету
 	- [ ] сформулировать исследовательский вопрос
 - [ ] Задание 2:
 	- [ ] визуализация
