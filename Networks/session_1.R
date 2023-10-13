@@ -261,6 +261,7 @@ par(mfrow = c(1, 2))
 hist(degree(karate), main = "Histogram of node degree", breaks = 1:vcount(karate)-1, prob = TRUE)
 hist(degree(g.random), main = "Histogram of node degree", breaks = 1:vcount(karate)-1, prob = TRUE)
 par(mfrow = c(1, 1))
+# для случайного графа распределение степеней вершин биномиальное
 
 gl <- vector('list', 1000)
 m <- rep(NA, 1000)
@@ -269,7 +270,7 @@ for(i in 1:1000){
   m[i] <- mean_distance(gl[[i]])
 }
 hist(m, xlim = range(c(min(m), 6)))
-abline(v = mean_distance(karate), col = "red", lty = 3, lwd = 2)
+abline(v = mean_distance(karate, weights=NA), col = "red", lty = 3, lwd = 2)
 # оказывается, в случайном графе очень маленькое расстояние между вершинами
 
 # модель Watts-Strogatz
