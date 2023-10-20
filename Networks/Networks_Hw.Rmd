@@ -1,0 +1,2183 @@
+---
+title: "Дз по Сетевым моделям"
+output:
+  html_notebook: default
+  author: "Кабанов Илья, Сухов Александр, Сысоев Никита"
+  pdf_document: default
+---
+
+## Подготовительные шаги
+
+```{r}
+# Установим рабочую директорию
+setwd("~/Documents/GitHub/RProjects_EF/Networks")
+```
+
+```{r}
+# Подгрузим необходимые для дальнейшего анализа библиотеки
+## install.packages("igraph")
+## install.packages("igraphdata")
+## install.packages("network") 
+## install.packages("tidygraph")
+## install.packages("ggraph")
+## install.packages("visNetwork")
+## install.packages("threejs")
+## install.packages("networkD3")
+## install.packages("DigrammeR")
+
+
+library(igraph);
+library(igraphdata);
+# library(intergraph);
+library(network);
+library(tidygraph);
+library(ggraph);
+library(visNetwork);
+library(threejs);
+library(networkD3);
+# library(DigrammeR);
+```
+
+## Обработка данных и создание графа
+
+```{r}
+# Загрузим данные для исследования
+edges <- read.csv("edges_1.csv", header=T) 
+# edges <- edges[1:500, ]
+colnames(edges) <- c('from', 'to', 'type1', 'type2', 'weight')
+
+nodes <- unique(edges[c('from', 'type1')])
+more_nodes <- unique(edges[c('to', 'type2')])
+
+colnames(nodes) <- c('organisation', 'type')
+colnames(more_nodes) <- c('organisation', 'type')
+
+nodes <- rbind(nodes, more_nodes)
+nodes <- unique(nodes[c('organisation', 'type')])
+rownames(nodes) <- NULL
+edges <- edges[c('from', 'to', 'weight')]
+
+# Создадим также набор обратных величин для весов ребер (это пригодится нам в дальнейшем)
+edges_inv <- edges
+edges_inv$weight <- 1 / edges_inv$weight
+
+net <- graph_from_data_frame(d=edges, vertices=nodes, directed=F)
+net_inv <- graph_from_data_frame(d=edges_inv, vertices=nodes, directed=F)
+# направленный граф нужен для визуализации графа при помощи пакета ggraph
+net_directed <- graph_from_data_frame(d=edges, vertices=nodes, directed=T)
+```
+
+## Исследовательский вопрос
+
+Исследовательский вопрос: ...
+
+## Анализ датасета
+
+### Задание 5
+
+Исполним процедуру кластеризации вершин при помощи Edge-betweenness и Fast-greedy методов и сравним полученные результаты с существующей классификацией.
+
+Т.к. считать кратчайший путь для исходных весов ребер является не очень осмысленным[^1], модифицируем исходный граф, заменив веса ребер на обратные им величины[^2].
+
+[^1]: Для Fast-greedy можно не менять исходные данные, т.к. этот метод не учитывает веса ребер, а только их количество
+
+[^2]: Кратчайший путь и кратчайшее расстояние в данной задаче будут представлять собой не то же самое, что и в задаче с издержками перевозок или длинами расстояний между вершинами в качестве весов ребер)
+
+```{r}
+ceb <- cluster_edge_betweenness(net_inv, weights=E(net_inv)$weight)
+
+mbship_ceb <- membership(ceb) 
+mbship_ceb
+
+s_ceb <- sizes(ceb)
+s_ceb
+
+ms_ceb <- modularity(ceb)
+ms_ceb
+```
+
+```{r}
+ceb
+```
+
+```{r}
+plot(ceb)
+```
+
+```{r}
+
+#                                                 Heke Consulting 
+#                                                               5 
+#                               Helios Integrative Medical Centre 
+#                                                              30 
+#                                                        Hemptech 
+#                                                               8 
+#                                        Henderson Medical Centre 
+#                                                               2 
+#                                 Henderson Valley Primary School 
+#                                                               8 
+#                             Hepatitis Foundation of New Zealand 
+#                                                               6 
+#                                      Herbert Morton Accountants 
+#                                                               8 
+#                                               Heretaunga Health 
+#                                                               5 
+#                             Heritage New Zealand Pouhere Taonga 
+#                                                               5 
+#                              High Performance Sport New Zealand 
+#                                                              22 
+#                                         Highnam Associates Ltd. 
+#                                                               5 
+#                                          Hill Laboratories Ltd. 
+#                                                               3 
+#                                              Hiway Geotechnical 
+#                                                               5 
+#                      HodderBalog Social and Scientific Research 
+#                                                               4 
+#                                                     Holcim (NZ) 
+#                                                              31 
+#                                         Holmes Consulting Group 
+#                                                               7 
+#                                          Holmes Fire and Safety 
+#                                                               5 
+#                                       Horizons Regional Council 
+#                                                               3 
+#                                   Horowhenua Community Practice 
+#                                                               6 
+#                                        Horowhenua Library Trust 
+#                                                              32 
+#                                                     Horteye Ltd 
+#                                                               1 
+#                                                        HortPlus 
+#                                                               1 
+#                                             Hospice New Zealand 
+#                                                               2 
+#                               Hospice Palliative Care Education 
+#                                                               6 
+#                                                 Hospice Waikato 
+#                                                               5 
+#                                              Hot Solutions Ltd. 
+#                                                               7 
+#                                          Humes Pipeline Systems 
+#                                                               5 
+#                                           Huntly Community Link 
+#                                                              33 
+#                                                Hurricanes Rugby 
+#                                                              10 
+#                                              Hush Interiors Ltd 
+#                                                               4 
+#                               Hutt Valley District Health Board 
+#                                                               2 
+#                                              Hyland Consultants 
+#                                                               7 
+#                           Hyland Fatigue Earthquake Engineering 
+#                                                               7 
+#                                               Hyperbaric Health 
+#                                                               6 
+#                                                             IAG 
+#                                                               4 
+#                               Ian Kusabs and Associates Limited 
+#                                                               8 
+#                            Ian McLean Consultancy Services Ltd. 
+#                                                               5 
+#                                                   Ichthyo-niche 
+#                                                               4 
+#                                                       IGENZ Ltd 
+#                                                               2 
+#                                                             ILR 
+#                                                               6 
+#                                    Immunisation Advisory Centre 
+#                                                               2 
+#                                Inclusive Education Action Group 
+#                                                               5 
+#                                Independent Petroleum Laboratory 
+#                                                               1 
+#                                        Indufor Asia-Pacific Ltd 
+#                                                              11 
+#                                                 Infoics Limited 
+#                                                               9 
+#                                             Inform Planning Ltd 
+#                                                               5 
+#                                Infrastructure Decisions Limited 
+#                                                               4 
+#                                   Inglewood Veterinary Services 
+#                                                               9 
+#                                      Injury Prevention Aotearoa 
+#                                                              10 
+#                                                  Inland Revenue 
+#                                                               3 
+#                               Innate Immunotherapeutics Limited 
+#                                                               6 
+#                                             Innate therapeutics 
+#                                                               6 
+#                                        Inner City Women's Group 
+#                                                               5 
+#                                                 Inner Zest Ltd. 
+#                                                               5 
+#                                                  INR Online Ltd 
+#                                                               2 
+#                                        Insect Science Solutions 
+#                                                               3 
+#                                                    Insights MSD 
+#                                                               3 
+#                                                  Inspiring Ltd. 
+#                                                               2 
+#               Institution of Professional Engineers New Zealand 
+#                                                               4 
+#                     Intellectual Property Office of New Zealand 
+#                                                               3 
+#                                 Intensive Care Flight Paramedic 
+#                                                               2 
+#                                                    Interactionz 
+#                                                               8 
+#                                                         InterAg 
+#                                                               3 
+#                International Animal Welfare Consultants Limited 
+#                                                               9 
+#                          International Earth Sciences IESE Ltd. 
+#                                                               4 
+#                                   International Pacific College 
+#                                                               9 
+#                 International Student Ministries of New Zealand 
+#                                                               6 
+#                                   International Telematics Ltd. 
+#                                                               9 
+#                                                       Interpine 
+#                                                              11 
+#                                          Interpine Forestry Ltd 
+#                                                              11 
+#                             Intus Digestive and Colorectal Care 
+#                                                               6 
+#                                              Invenco Group Ltd. 
+#                                                               5 
+#                                       Investigation Geology Ltd 
+#                                                               4 
+#                                                           IPENZ 
+#                                                               8 
+#                                     Irrigation New Zealand Inc. 
+#                                                               1 
+#                                                        Isolytix 
+#                                                               6 
+#                                               IZON Science Ltd. 
+#                                                               6 
+#                                              Jackett Consulting 
+#                                                               7 
+#                                              Jacobs Engineering 
+#                                                               5 
+#                                       Jade Software Corporation 
+#                                                               6 
+#                                                James and Monroe 
+#                                                               9 
+#                                            JMR Distributors Ltd 
+#                                                               9 
+#                                                John Jones Steel 
+#                                                               5 
+#                                            John Wood Consulting 
+#                                                               4 
+#                                      Johne's Management Limited 
+#                                                               3 
+#                                          Jowett Consulting Ltd. 
+#                                                               3 
+#                                                   JRA (NZ) Ltd. 
+#                                                               5 
+#                              Julian King and Associates Limited 
+#                                                               2 
+#                                                  Ka Mau Te Wero 
+#                                                               3 
+#                                         Kaikorai Valley College 
+#                                                               6 
+#                          Kaikoura Ocean Research Institute Inc. 
+#                                                               5 
+#                                     Kaipaki Veterinary Services 
+#                                                               9 
+#                                        Kaipara District Council 
+#                                                               9 
+#                                   Kapiti Coast District Council 
+#                                                               3 
+#                                          Karori Sanctuary Trust 
+#                                                               3 
+#                                                       Katoa Ltd 
+#                                                               5 
+#                                          Kea Conservation Trust 
+#                                                               3 
+#                                                  KEA Consultant 
+#                                                              34 
+#                                                    Keratec Ltd. 
+#                                                               3 
+#                                       Kidney Health New Zealand 
+#                                                               2 
+#                              Kina Families and Addictions Trust 
+#                                                               6 
+#                                      Kinetic Engineering Design 
+#                                                               5 
+#                                                  Kingdom Clinic 
+#                                                               6 
+#                                        Kiwi Well Evaluation Ltd 
+#                                                               4 
+#                                                   Kiwi Wildlife 
+#                                                               3 
+#                                            Kiwicap Research Ltd 
+#                                                              35 
+#                       Kiwikiwi Research and Evaluation Services 
+#                                                               6 
+#                                       Kono Horticulture Limited 
+#                                                               1 
+#                              Koru Environmental Consultants Ltd 
+#                                                               3 
+#                                               Koti Technologies 
+#                                                               4 
+#                                               Kumeu Observatory 
+#                                                              19 
+#                                            Kurahaupo Consulting 
+#                                                               3 
+#                                  KVB Kunlun New Zealand Limited 
+#                                                               9 
+#                                                        Labtests 
+#                                                               2 
+#                            Lake Hawea Institute of Cryodynamics 
+#                                                               4 
+#                                     Lakes District Health Board 
+#                                                               2 
+#                                    Land Information New Zealand 
+#                                                              10 
+#                                               Landcare Research 
+#                                                               3 
+#                                        Landcorp Farming Limited 
+#                                                               9 
+#                                               Langimalie Clinic 
+#                                                               2 
+#                                               LanzaTech NZ Ltd. 
+#                                                              11 
+#                               Lassey Research and Education Ltd 
+#                                                               3 
+#                                              Lateral Technology 
+#                                                               5 
+#                                           Laura Fergusson Trust 
+#                                                               6 
+#                                                  Law Commission 
+#                                                               4 
+#                                        LeaderBrand Produce Ltd. 
+#                                                               1 
+#                                     Learning for Sustainability 
+#                                                               3 
+#              Leather & Shoe Research Association of New Zealand 
+#                                                               3 
+#                                     Leinster Orthopaedic Centre 
+#                                                               2 
+#                                                  Levare Limited 
+#                                                               2 
+#                          Levin and Horowhenua Veterinary Centre 
+#                                                               9 
+#                                           Lewis and Barrow Ltd. 
+#                                                               7 
+#                                                             LIC 
+#                                                               3 
+#                                          Life Technologies Ltd. 
+#                                                               4 
+#                                    LightBox Psychology Services 
+#                                                               6 
+#                                           Lincoln Agritech Ltd. 
+#                                                               3 
+#                                              Lincoln University 
+#                                                               3 
+#                                             Lincolne Scott Ltd. 
+#                                                               4 
+#                                               Lindis Consulting 
+#                                                               3 
+#                                             Linnaeus Laboratory 
+#                                                               6 
+#                                                          Litmus 
+#                                                               2 
+#                                Livestock Solutions and Services 
+#                                                               9 
+#                                Living Cell Technologies NZ Ltd. 
+#                                                               2 
+#                                    Local Government New Zealand 
+#                                                               3 
+#                                                   Logjiztix Ltd 
+#                                                              11 
+#                                                         Lowe NZ 
+#                                                               3 
+#                                      Lucas Industries (NZ) Ltd. 
+#                                                               5 
+#                                       LWT Animal Nutrition Ltd. 
+#                                                               9 
+#                               MacMurray Hypertension Clinic Ltd 
+#                                                               5 
+#                                                           MAGAK 
+#                                                              16 
+#              Magic Sparks Early Learning and Development Centre 
+#                                                               9 
+#                                                Magritek Limited 
+#                                                               5 
+#                                                 Makoura College 
+#                                                               4 
+#                          Malaghan Institute of Medical Research 
+#                                                               6 
+#                            Male Survivors of Sexual Abuse Trust 
+#                                                               4 
+#                                               Manaaki Te Awanui 
+#                                                               3 
+#                       Manaia Health Primary Health Organisation 
+#                                                              10 
+#                                            Manawatu Diagnostics 
+#                                                               9 
+#    Mangere Community Health Trust (Primary Health Organisation) 
+#                                                               2 
+#                                 Manukau Institute of Technology 
+#                                                               9 
+#                                             Manukau SuperClinic 
+#                                                               5 
+#                                           Manurewa South School 
+#                                                               5 
+#                                               Maori Hill Clinic 
+#                                                               6 
+#                                   Maori Pharmacists Association 
+#                                                               2 
+#                                     Maramatanga Consultants Ltd 
+#                                                               9 
+#                      Marine Fisheries Research Services Limited 
+#                                                               3 
+#                                    Marine Wildlife Research Ltd 
+#                                                               3 
+#                                                 Marinoto Clinic 
+#                                                               2 
+#                           Mark L Batchelar Consulting Engineers 
+#                                                               4 
+#                                           Market Economics Ltd. 
+#                                                               9 
+#                                Marlborough Wine Research Center 
+#                                                               3 
+#                                             MARS Bioimaging Ltd 
+#                                                               6 
+#                                     Marshall Day Acoustics Ltd. 
+#                                                               5 
+#                                             Mary Potter Hospice 
+#                                                               5 
+#                                               Massey University 
+#                                                               9 
+#                                         Masters Consulting Ltd. 
+#                                                               3 
+#                                         Matakina Technology Ltd 
+#                                                               2 
+#                                         Matamata Medical Centre 
+#                                                               2 
+#                                Matamata Veterinary Services Ltd 
+#                                                               9 
+#                                                   MBCentury Ltd 
+#                                                               5 
+#                              McConnell Dowell Constructors Ltd. 
+#                                                               5 
+#                                           McLaren Research Ltd. 
+#                                                               1 
+#                                            McManus Geotech Ltd. 
+#                                                               7 
+#                           Medical Council of New Zealand (MCNZ) 
+#                                                               9 
+#                       Medical Research Institute of New Zealand 
+#                                                               2 
+#                                                  Medlab Central 
+#                                                               2 
+#                                                   Melanoma Unit 
+#                                                               2 
+#                 Member International Neuropsychological Society 
+#                                                               6 
+#                         Mental Health Education Resource Centre 
+#                                                               4 
+#                         Mental Health Foundation of New Zealand 
+#                                                               5 
+#                                            MercyAscot Hospitals 
+#                                                               2 
+#                                            Meridian Energy Ltd. 
+#                                                               7 
+#                                                  Mesynthes Ltd. 
+#                                                               6 
+#                      Meteorological Service of New Zealand Ltd. 
+#                                                              11 
+#                                                        Methanex 
+#                                                               4 
+#                                         MetOcean Solutions Ltd. 
+#                                                              11 
+#                                        Microfossil Research Ltd 
+#                                                               8 
+#                                MidCentral District Health Board 
+#                                                               2 
+#                                                     Midland MRI 
+#                                                               8 
+#                              Midland Regional Forensic Services 
+#                                                               5 
+#                                         Midlands Health Network 
+#                                                               2 
+#                                Midwifery Council of New Zealand 
+#                                                               7 
+#                                         Mighty River Power Ltd. 
+#                                                              16 
+#                                              Millar Instruments 
+#                                                               3 
+#                                            Milton Health Centre 
+#                                                               6 
+#                                 Ministry for Primary Industries 
+#                                                               3 
+#                                   Ministry for Primary Industry 
+#                                                               4 
+#                                    Ministry for the Environment 
+#                                                               3 
+#                  Ministry of Business Innovation and Employment 
+#                                                               7 
+#              Ministry of Civil Defence and Emergency Management 
+#                                                               7 
+#                                           Ministry of Education 
+#                                                               9 
+#                           Ministry of Foreign Affairs and Trade 
+#                                                              10 
+#                                              Ministry of Health 
+#                                                               2 
+#                                             Ministry of Justice 
+#                                                               2 
+#                              Ministry of Pacific Island Affairs 
+#                                                               4 
+#                                  Ministry of Social Development 
+#                                                               5 
+#                                           Ministry of Transport 
+#                                                               4 
+#                                  Mission Heights Primary School 
+#                                                               3 
+#                                        MLB Consulting Engineers 
+#                                                               4 
+#                               Molehill Astronomical Observatory 
+#                                                              19 
+#                                        Moorhouse Medical Clinic 
+#                                                               2 
+#                                        Morrison Consultants Ltd 
+#                                                              11 
+#                        Motu Economic and Public Policy Research 
+#                                                               3 
+#                             Mountains to Sea Conservation Trust 
+#                                                               3 
+#                                           MSD Animal Health Ltd 
+#                                                               9 
+#                           Mt. Albert Psychological Services Ltd 
+#                                                               9 
+#                                          Mulgor Consulting Ltd. 
+#                                                               7 
+#                   Muscular Dystrophy Association of New Zealand 
+#                                                               6 
+#                                             MWH New Zealand Ltd 
+#                                                               5 
+#                                              N-Squared Software 
+#                                                               4 
+#                                           NaeNae Medical Centre 
+#                                                               2 
+#                                       National Addiction Centre 
+#                                                               6 
+#                National Association of Steel-Framed Housing Inc 
+#                                                               5 
+#                        National Council of Women of New Zealand 
+#                                                               1 
+#                        National Heart Foundation of New Zealand 
+#                                                               2 
+#   National Library of New Zealand Te Puna Matauranga O Aotearoa 
+#                                                               2 
+#                    National Maori Health Workforce Organisation 
+#                                                               6 
+#                                      Natural Resource Assessors 
+#                                                               3 
+#                                    Needle Exchange Programme NZ 
+#                                                               5 
+#                                          Nelson Forests Limited 
+#                                                               4 
+#                        Nelson Marlborough District Health Board 
+#                                                               2 
+#                                Nelson Marlborough Fish and Game 
+#                                                               3 
+#                      Nelson Marlborough Institute of Technology 
+#                                                               3 
+#                             Nelson Marlborough Regional Council 
+#                                                               3 
+#                                    Neonatal Intensive Care Unit 
+#                                                               6 
+#                                                         NetSafe 
+#                                                               5 
+#                                                        NetValue 
+#                                                              36 
+#                                          Neuren Pharmaceuticals 
+#                                                               5 
+#                          Neurological Foundation of New Zealand 
+#                                                               5 
+#                                        New Brighton Health Care 
+#                                                               6 
+#                                             New Image Group Ltd 
+#                                                               5 
+#                                                   New River Ltd 
+#                                                               6 
+#                                    New Zealand Academy of Sport 
+#                                                               3 
+#                                      New Zealand Aerial Mapping 
+#                                                              11 
+#         New Zealand Agricultural Greenhouse Gas Research Centre 
+#                                                               3 
+#                                   New Zealand Agriseeds Limited 
+#                                                               9 
+#                                     New Zealand AIDS Foundation 
+#                                                               2 
+#                          New Zealand Aluminium Smelters Limited 
+#                                                               5 
+#                                 New Zealand Antarctic Institute 
+#                                                               4 
+#                                              New Zealand Arable 
+#                                                              27 
+#                         New Zealand Association of Optometrists 
+#                                                               9 
+#                         New Zealand Avocado Growers Association 
+#                                                               1 
+#            New Zealand BioSecure Entomology Laboratory Research 
+#                                                               4 
+#                                       New Zealand Blood Service 
+#                                                               2 
+#                            New Zealand Brain Research Institute 
+#                                                               6 
+#                            New Zealand Breast Cancer Foundation 
+#                                                               6 
+#            New Zealand Centre for Conservation Medicine (NZCCM) 
+#                                                               4 
+#                            New Zealand Climate & Health Council 
+#                                                               6 
+#                             New Zealand College of Chiropractic 
+#                                                               5 
+#                                 New Zealand College of Midwives 
+#                                                               7 
+#                               New Zealand Cot Death Association 
+#                                                               5 
+#            New Zealand Council for Educational Research (NZCER) 
+#                                                               9 
+#                                       New Zealand Defence Force 
+#                                                               6 
+#                                  New Zealand Dental Association 
+#                                                               6 
+#  New Zealand Employment Service and Work and Income New Zealand 
+#                                                               4 
+#            New Zealand Familial Gastrointestinal Cancer Service 
+#                                                               2 
+#                                        New Zealand Forestry Ltd 
+#                                                              11 
+#                     New Zealand Geotechnical Society Ine (NZGS) 
+#                                                              37 
+#                                    New Zealand Guidelines Group 
+#                                                               2 
+#                    New Zealand Gynaecological Cancer Foundation 
+#                                                               2 
+#                   New Zealand Heart and Lung Transplant Service 
+#                                                               2 
+#              New Zealand Heavy Engineering Research Association 
+#                                                               5 
+#     New Zealand Homebased Early Childhood Education Association 
+#                                                               6 
+#          New Zealand Institute for Plastic and Cosmetic Surgery 
+#                                                               6 
+#                  New Zealand Institute of Community Health Care 
+#                                                               4 
+#                      New Zealand Institute of Economic Research 
+#                                                               2 
+#             New Zealand Institute of Medical Laboratory Science 
+#                                                               2 
+#                           New Zealand Institute of Rural Health 
+#                                                               6 
+#                                     New Zealand Kiwi Foundation 
+#                                                               5 
+#                                 New Zealand Medical Association 
+#                                                               6 
+#                       New Zealand Medical Students' Association 
+#                                                               5 
+#                                   New Zealand National Eye Bank 
+#                                                               2 
+#                                 New Zealand National LCP Office 
+#                                                               2 
+#                           New Zealand Needle Exchange Programme 
+#                                                               6 
+#                                 New Zealand Nurses Organisation 
+#                                                               2 
+#                                   New Zealand Olympic Committee 
+#                                                               6 
+#             New Zealand Organisation for Rare Disorders (NZORD) 
+#                                                               6 
+#                                          New Zealand Parliament 
+#                                                               4 
+#                                              New Zealand Police 
+#                                                               6 
+#                            New Zealand Qualifications Authority 
+#                                                               4 
+#                                   New Zealand Refining Co. Ltd. 
+#                                                               4 
+#                            New Zealand Rheumatology Association 
+#                                                               2 
+#                                         New Zealand Rugby Union 
+#                                                               6 
+# New Zealand School Acupuncture and Traditional Chinese Medicine 
+#                                                               4 
+#                                     New Zealand School of Music 
+#                                                               4 
+#                        New Zealand Seafood Industry Council Ltd 
+#                                                               3 
+#          New Zealand Society for Earthquake Engineering (NZSEE) 
+#                                                              37 
+#                                        New Zealand Spinal Trust 
+#                                                               6 
+#                                    New Zealand Tertiary College 
+#                                                              10 
+#                                     New Zealand Timberlands Ltd 
+#                                                               4 
+#                                    New Zealand Transport Agency 
+#                                                               4 
+#                                            New Zealand Treasury 
+#                                                               3 
+#                           New Zealand Underwater Heritage Group 
+#                                                               8 
+#                           New Zealand Veterinary Pathology Ltd. 
+#                                                               9 
+#                                         New Zealand Winegrowers 
+#                                                               5 
+#                                          Newman Energy Research 
+#                                                               4 
+#                                          Newtown Medical Centre 
+#                                                               6 
+#                                                  NextWindow Ltd 
+#                                                               6 
+#                                              Ngati Porou Hauora 
+#                                                               5 
+#                                  Ngati Whakaue Tribal Lands Inc 
+#                                                              11 
+#                                                 Nielsen Company 
+#                                                               5 
+#                                    NIU Development Incorporated 
+#                                                               9 
+#                                                            NIWA 
+#                                                               3 
+#                                              Norske Skog Tasman 
+#                                                               5 
+#                             North Canterbury Veterinary Clinics 
+#                                                               9 
+#                                             North Shore Hospice 
+#                                                               2 
+#                               North Shore International Academy 
+#                                                               9 
+#                             Northcott Research Consultants Ltd. 
+#                                                               3 
+#                                         Northern Cancer Network 
+#                                                               2 
+#                                   Northern Region IDEA Services 
+#                                                               5 
+#                                      Northern Regional Alliance 
+#                                                               2 
+#                          Northern Southland Veterinary Services 
+#                                                               9 
+#                                 Northland District Health Board 
+#                                                               6 
+#                                      Northland Regional Council 
+#                                                               9 
+#                                                        NorthTec 
+#                                                               3 
+#                                              Novare Design Ltd. 
+#                                                               4 
+#                                                    Numcore Ltd. 
+#                                                               5 
+#                                                    Numinos Ltd. 
+#                                                               5 
+#                                         Nurse Maude Association 
+#                                                               4 
+#                                       Nutrigenomics New Zealand 
+#                                                               1 
+#                                Nutrition Society of New Zealand 
+#                                                               6 
+#                                                  NZ Oil and Gas 
+#                                                               4 
+#                                         NZ Parsa Tiling Limited 
+#                                                               4 
+#                                               NZFOCUS (NZ) Ltd. 
+#                                                               5 
+#                                                     NZX Limited 
+#                                                               5 
+#                                     O'Kane Consultants (NZ) Ltd 
+#                                                               7 
+#                                                 Oamaru Hospital 
+#                                                               6 
+#                                                   Odyssey House 
+#                                                               5 
+#                Office of the Health and Disability Commissioner 
+#                                                               5 
+#    Office of the Parliamentary Commissioner for the Environment 
+#                                                               3 
+#                                            Omahu Urology Clinic 
+#                                                               6 
+#                                            OMV New Zealand Ltd. 
+#                                                               7 
+#                                           Oncology Surgery Ltd. 
+#                                                               2 
+#                                 Open Polytechnic of New Zealand 
+#                                                               6 
+#                                           OPRA Consulting Group 
+#                                                               4 
+#                                         Optimal Clinical Trials 
+#                                                               2 
+#                              Opus International Consultants Ltd 
+#                                                               7 
+#                                              Oracle New Zealand 
+#                                                               4 
+#                                              Oral Health Centre 
+#                                                               6 
+#                                               Orange Consulting 
+#                                                               6 
+#                                                   Orb Solutions 
+#                                                               8 
+#                                      Organ Donation New Zealand 
+#                                                              10 
+#                                             Oritain Global Ltd. 
+#                                                               6 
+#                           Ornithological Society of New Zealand 
+#                                                               9 
+#                                           Orokonui Ecosanctuary 
+#                                                               4 
+#                                                           OSPRI 
+#                                                               8 
+#                                         Otago Community Hospice 
+#                                                               4 
+#                        Otago Computational Modelling Group Ltd. 
+#                                                               4 
+#                                    Otago Daily Times Collective 
+#                                                               6 
+#                                         Otago Girls High School 
+#                                                               4 
+#                                                    Otago Museum 
+#                                                               3 
+#                                               Otago Polytechnic 
+#                                                               7 
+#                                          Otago Regional Council 
+#                                                               3 
+#                                                 Otahuhu College 
+#                                                               2 
+#                                            Otakaro Pathways Ltd 
+#                                                               6 
+#                                       Otorohanga Dental Surgery 
+#                                                               6 
+#                                                  OTRS Group Ltd 
+#                                                               6 
+#                                      Outome Management Services 
+#                                                               5 
+#                                        P.N. Plimmer and Associ. 
+#                                                               5 
+#                                     PA Handford and Assoc. Ltd. 
+#                                                              11 
+#                                                  Pacific Brands 
+#                                                               5 
+#                                 Pacific Edge Biotechnology Ltd. 
+#                                                               2 
+#              Pacific Health Research and Development Foundation 
+#                                                               9 
+#                                         Pacific Radiology Group 
+#                                                               2 
+#            Pacific Women's Health Research and Development Unit 
+#                                                               2 
+#                                        Pakuranga Medical Centre 
+#                                                               2 
+#                                           Palaecol Research Ltd 
+#                                                               7 
+#                                   Palmerston North City Council 
+#                                                               9 
+#                                   Palmerston North City Library 
+#                                                               4 
+#                                                    Pansophy Ltd 
+#                                                               3 
+#                                    Papamoa Pines Medical Centre 
+#                                                               2 
+#                                             Paraparaumu College 
+#                                                               9 
+#                                                   Paric Limited 
+#                                                               5 
+#                                         Parkinson's New Zealand 
+#                                                               5 
+#                                       Parresia Research Limited 
+#                                                               5 
+#                                            Parsons Brinckerhoff 
+#                                                               5 
+#                                     Pasifika Horizon Healthcare 
+#                                                               5 
+#                                    Pasifika Medical Association 
+#                                                               2 
+#                                           Pasifika Research Ltd 
+#                                                               5 
+#                                                         Pathlab 
+#                                                               2 
+#                                                  Patients First 
+#                                                               2 
+#                                Paton-Simpson Associates Limited 
+#                                                              10 
+#                                    Pattle Delamore Partners Ltd 
+#                                                               4 
+#                                              Pegasus Health Ltd 
+#                                                               6 
+#                                        Penny and Associates Ltd 
+#                                                               2 
+#               Perinatal and Maternal Mortality Review Committee 
+#                                                               2 
+#                                   Petersgate Counselling Centre 
+#                                                               4 
+#                                        PF Olsen and Company Ltd 
+#                                                              11 
+#                                        PGG Wrightson Seeds Ltd. 
+#                                                              27 
+#                                                         PHARMAC 
+#                                                               2 
+#                                              Pharmaceuticol Ltd 
+#                                                               2 
+#                                   Pharmacy Guild of New Zealand 
+#                                                               5 
+#                                       PharmTech Service Limited 
+#                                                               9 
+#                  Philosophy of Education Society of Australasia 
+#                                                               5 
+#                                         Photonz Corporation Ltd 
+#                                                               5 
+#                                                     Pictor Ltd. 
+#                                                               5 
+#                                                 Pingar Research 
+#                                                               8 
+#                                              Pinnacle Group Ltd 
+#                                                               6 
+#                                                PipeTechnologies 
+#                                                               5 
+#                                            Pipfruit New Zealand 
+#                                                               9 
+#                                        Planning Consultants Ltd 
+#                                                               5 
+#                                         Plant and Food Research 
+#                                                               1 
+#                               Plant Protection Chemistry NZ Ltd 
+#                                                               1 
+#                                               PlusGroup Limited 
+#                                                               3 
+#                                                 Pohatu Penguins 
+#                                                               3 
+#                                                 Polybatics Ltd. 
+#                                                               9 
+#                                            Porirua City Council 
+#                                                               6 
+#                                       Ports of Auckland Limited 
+#                                                               5 
+#                                           Positive Thinking Ltd 
+#                                                               5 
+#                                              Possum Observatory 
+#                                                              19 
+#                                   Potter Building Services Ltd. 
+#                                                               9 
+#                                                   Power Co Ltd. 
+#                                                               5 
+#                       Power Systems Consultants New Zealand Ltd 
+#                                                              10 
+#                                               PowerbyProxi Ltd. 
+#                                                               5 
+#                                         Powerhouse Ventures Ltd 
+#                                                               6 
+#                                     Practitioners First Limited 
+#                                                               5 
+#                              Presbyterian Church of New Zealand 
+#                                                               5 
+#                                   PriceWaterhouse Coopers (PwC) 
+#                                                               6 
+#                                Priestley Structural Engineering 
+#                                                               4 
+#                                     Private Endodontic Practice 
+#                                                               6 
+#                                          ProCare Health Limited 
+#                                                               2 
+#                                     Prohealth Physiotherapy Ltd 
+#                                                               5 
+#                                                    Promisia Ltd 
+#                                                               6 
+#                           Proteus Wildlife Research Consultants 
+#                                                              11 
+#                                           Psychological Service 
+#                                                               5 
+#                                               Psychology Centre 
+#                                                               2 
+#                                         Pultron Composites Ltd. 
+#                                                              11 
+#                                                         Pyrotek 
+#                                                               5 
+#                                                      Q-Bit Ltd. 
+#                                                               4 
+#                                                       QE Health 
+#                                                               5 
+#                                                      Qnique Ltd 
+#                                                               4 
+#                                            QStar Solutions Ltd. 
+#                                                               7 
+#                                                       Quadradix 
+#                                                               5 
+#                                        Quay Park Medical Centre 
+#                                                               5 
+#                                           Queens Academic Group 
+#                                                               5 
+#                                      Quest Integrity Group Ltd. 
+#                                                               4 
+#                                          Quigley and Watts Ltd. 
+#                                                               6 
+#                                    Quin Environmentals(NZ) Ltd. 
+#                                                               9 
+#                                  Quintessence Developments Ltd. 
+#                                                               4 
+#                                                      Quit Group 
+#                                                               2 
+#                                   Radiata Pine Breeding Company 
+#                                                              11 
+#                                       Radio Spectrum Management 
+#                                                               4 
+#                                                      Rakon Ltd. 
+#                                                               5 
+#                                        Rangiora New Life School 
+#                                                               6 
+#                         Rape Prevention Education-Whakatu Mauri 
+#                                                               9 
+#                             Rauawaawa Kaumatua Charitable Trust 
+#                                                               6 
+#                                 Raukatauri Music Therapy Centre 
+#                                                               5 
+#                                   Raukura Hauora O Tainui Trust 
+#                                                               5 
+#                                        Rayonier New Zealand Ltd 
+#                                                               4 
+#                               Refugees as Survivors New Zealand 
+#                                                               5 
+#                                   Reid Construction Systems Ltd 
+#                                                               4 
+#                                                Renewable Energy 
+#                                                              11 
+#                                                        Repromed 
+#                                                               2 
+#                                     Reserve Bank of New Zealand 
+#                                                               3 
+#                                         Resilient Organisations 
+#                                                               5 
+#                        Resource Teacher: Learning and Behaviour 
+#                                                               5 
+#                                           Revolution Fibres Ltd 
+#                                                               4 
+#                                                Riccarton Rotary 
+#                                                              38 
+#                         Risk Strategies Research and Consulting 
+#                                                               4 
+#                                              Rivuli Development 
+#                                                               8 
+#                                                 RML Engineering 
+#                                                               8 
+#                                          Roche Products Limited 
+#                                                               5 
+#                                             Rockwell Automation 
+#                                                               5 
+#                                     Rolleston Veterinary Clinic 
+#                                                               3 
+#                                   Ropata Village Medical Centre 
+#                                                               2 
+#                                  Rotorua General Practice Group 
+#                                                               6 
+#                                        Rowe Davies Research Ltd 
+#                                                               5 
+#       Royal Australian and New Zealand College of Psychiatrists 
+#                                                               5 
+#         Royal Forest and Bird Protection Society of New Zealand 
+#                                                               3 
+#              Royal New Zealand College of General Practitioners 
+#                                                               2 
+#                               Royal New Zealand Plunket Society 
+#                                                               9 
+#                                    Royal Society of New Zealand 
+#                                                               1 
+#                       Ruaimoko Productions and Consultancy Ltd. 
+#                                                               6 
+#                                                      Rumenz Ltd 
+#                                                               5 
+#                                                       RuralLink 
+#                                                               8 
+#  [ reached getOption("max.print") -- omitted 511 entries ]
+```
+
+```{r}
+# > s_ceb <- sizes(ceb)
+# > s_ceb
+# Community sizes
+#   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20 
+#  45 213 233 154 229 190  75  46 164  48  32   2   2   2   3  15   2   2   8   2 
+#  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38 
+#   2   4   2   2   2   2   7   2   2   2   2   2   2   2   2   2   3   2 
+```
+
+```{r}
+# > ms_ceb <- modularity(ceb)
+# > ms_ceb
+# [1] 0.527262
+```
+
+```{r}
+plot(ceb, net)
+```
+
+```{r}
+cfg <- cluster_fast_greedy(net_inv, weights=E(net_inv)$weight) 
+# plot(cfg, net)
+mbship_cfg <- membership(cfg) 
+mbship_cfg
+s_cfg <- sizes(cfg)
+s_cfg
+ms_cfg <- modularity(cfg)
+ms_cfg
+```
+
+```{r}
+cfg
+```
+
+```{r}
+#                                                 Heke Consulting 
+#                                                               1 
+#                               Helios Integrative Medical Centre 
+#                                                              19 
+#                                                        Hemptech 
+#                                                               3 
+#                                        Henderson Medical Centre 
+#                                                               7 
+#                                 Henderson Valley Primary School 
+#                                                               3 
+#                             Hepatitis Foundation of New Zealand 
+#                                                               7 
+#                                      Herbert Morton Accountants 
+#                                                               3 
+#                                               Heretaunga Health 
+#                                                               1 
+#                             Heritage New Zealand Pouhere Taonga 
+#                                                               1 
+#                              High Performance Sport New Zealand 
+#                                                               2 
+#                                         Highnam Associates Ltd. 
+#                                                               1 
+#                                          Hill Laboratories Ltd. 
+#                                                               8 
+#                                              Hiway Geotechnical 
+#                                                               1 
+#                      HodderBalog Social and Scientific Research 
+#                                                               6 
+#                                                     Holcim (NZ) 
+#                                                              36 
+#                                         Holmes Consulting Group 
+#                                                               3 
+#                                          Holmes Fire and Safety 
+#                                                               8 
+#                                       Horizons Regional Council 
+#                                                               3 
+#                                   Horowhenua Community Practice 
+#                                                               2 
+#                                        Horowhenua Library Trust 
+#                                                              35 
+#                                                     Horteye Ltd 
+#                                                               5 
+#                                                        HortPlus 
+#                                                               5 
+#                                             Hospice New Zealand 
+#                                                               1 
+#                               Hospice Palliative Care Education 
+#                                                               8 
+#                                                 Hospice Waikato 
+#                                                               1 
+#                                              Hot Solutions Ltd. 
+#                                                               3 
+#                                          Humes Pipeline Systems 
+#                                                               1 
+#                                           Huntly Community Link 
+#                                                              34 
+#                                                Hurricanes Rugby 
+#                                                               9 
+#                                              Hush Interiors Ltd 
+#                                                               8 
+#                               Hutt Valley District Health Board 
+#                                                               7 
+#                                              Hyland Consultants 
+#                                                               3 
+#                           Hyland Fatigue Earthquake Engineering 
+#                                                               3 
+#                                               Hyperbaric Health 
+#                                                              10 
+#                                                             IAG 
+#                                                               8 
+#                               Ian Kusabs and Associates Limited 
+#                                                               3 
+#                            Ian McLean Consultancy Services Ltd. 
+#                                                               1 
+#                                                   Ichthyo-niche 
+#                                                               8 
+#                                                       IGENZ Ltd 
+#                                                               1 
+#                                                             ILR 
+#                                                              10 
+#                                    Immunisation Advisory Centre 
+#                                                               7 
+#                                Inclusive Education Action Group 
+#                                                               1 
+#                                Independent Petroleum Laboratory 
+#                                                               1 
+#                                        Indufor Asia-Pacific Ltd 
+#                                                              14 
+#                                                 Infoics Limited 
+#                                                               4 
+#                                             Inform Planning Ltd 
+#                                                               1 
+#                                Infrastructure Decisions Limited 
+#                                                               4 
+#                                   Inglewood Veterinary Services 
+#                                                               4 
+#                                      Injury Prevention Aotearoa 
+#                                                               9 
+#                                                  Inland Revenue 
+#                                                               6 
+#                               Innate Immunotherapeutics Limited 
+#                                                              11 
+#                                             Innate therapeutics 
+#                                                              10 
+#                                        Inner City Women's Group 
+#                                                               1 
+#                                                 Inner Zest Ltd. 
+#                                                               1 
+#                                                  INR Online Ltd 
+#                                                               7 
+#                                        Insect Science Solutions 
+#                                                               5 
+#                                                    Insights MSD 
+#                                                               8 
+#                                                  Inspiring Ltd. 
+#                                                               1 
+#               Institution of Professional Engineers New Zealand 
+#                                                              11 
+#                     Intellectual Property Office of New Zealand 
+#                                                               5 
+#                                 Intensive Care Flight Paramedic 
+#                                                               7 
+#                                                    Interactionz 
+#                                                               3 
+#                                                         InterAg 
+#                                                               5 
+#                International Animal Welfare Consultants Limited 
+#                                                               4 
+#                          International Earth Sciences IESE Ltd. 
+#                                                               6 
+#                                   International Pacific College 
+#                                                               4 
+#                 International Student Ministries of New Zealand 
+#                                                               2 
+#                                   International Telematics Ltd. 
+#                                                               8 
+#                                                       Interpine 
+#                                                              14 
+#                                          Interpine Forestry Ltd 
+#                                                              14 
+#                             Intus Digestive and Colorectal Care 
+#                                                               2 
+#                                              Invenco Group Ltd. 
+#                                                               1 
+#                                       Investigation Geology Ltd 
+#                                                               8 
+#                                                           IPENZ 
+#                                                               3 
+#                                     Irrigation New Zealand Inc. 
+#                                                               5 
+#                                                        Isolytix 
+#                                                               2 
+#                                               IZON Science Ltd. 
+#                                                               8 
+#                                              Jackett Consulting 
+#                                                               3 
+#                                              Jacobs Engineering 
+#                                                               1 
+#                                       Jade Software Corporation 
+#                                                               8 
+#                                                James and Monroe 
+#                                                               9 
+#                                            JMR Distributors Ltd 
+#                                                               4 
+#                                                John Jones Steel 
+#                                                               1 
+#                                            John Wood Consulting 
+#                                                               8 
+#                                      Johne's Management Limited 
+#                                                              10 
+#                                          Jowett Consulting Ltd. 
+#                                                               3 
+#                                                   JRA (NZ) Ltd. 
+#                                                               1 
+#                              Julian King and Associates Limited 
+#                                                               7 
+#                                                  Ka Mau Te Wero 
+#                                                              10 
+#                                         Kaikorai Valley College 
+#                                                               2 
+#                          Kaikoura Ocean Research Institute Inc. 
+#                                                               1 
+#                                     Kaipaki Veterinary Services 
+#                                                               4 
+#                                        Kaipara District Council 
+#                                                               4 
+#                                   Kapiti Coast District Council 
+#                                                               5 
+#                                          Karori Sanctuary Trust 
+#                                                               4 
+#                                                       Katoa Ltd 
+#                                                               1 
+#                                          Kea Conservation Trust 
+#                                                               3 
+#                                                  KEA Consultant 
+#                                                              32 
+#                                                    Keratec Ltd. 
+#                                                               2 
+#                                       Kidney Health New Zealand 
+#                                                               7 
+#                              Kina Families and Addictions Trust 
+#                                                               4 
+#                                      Kinetic Engineering Design 
+#                                                               1 
+#                                                  Kingdom Clinic 
+#                                                               2 
+#                                        Kiwi Well Evaluation Ltd 
+#                                                               6 
+#                                                   Kiwi Wildlife 
+#                                                               3 
+#                                            Kiwicap Research Ltd 
+#                                                              29 
+#                       Kiwikiwi Research and Evaluation Services 
+#                                                               7 
+#                                       Kono Horticulture Limited 
+#                                                               2 
+#                              Koru Environmental Consultants Ltd 
+#                                                               3 
+#                                               Koti Technologies 
+#                                                               8 
+#                                               Kumeu Observatory 
+#                                                               9 
+#                                            Kurahaupo Consulting 
+#                                                              10 
+#                                  KVB Kunlun New Zealand Limited 
+#                                                               4 
+#                                                        Labtests 
+#                                                               7 
+#                            Lake Hawea Institute of Cryodynamics 
+#                                                               6 
+#                                     Lakes District Health Board 
+#                                                               7 
+#                                    Land Information New Zealand 
+#                                                               9 
+#                                               Landcare Research 
+#                                                              10 
+#                                        Landcorp Farming Limited 
+#                                                               4 
+#                                               Langimalie Clinic 
+#                                                               7 
+#                                               LanzaTech NZ Ltd. 
+#                                                               2 
+#                               Lassey Research and Education Ltd 
+#                                                               3 
+#                                              Lateral Technology 
+#                                                               1 
+#                                           Laura Fergusson Trust 
+#                                                               2 
+#                                                  Law Commission 
+#                                                               6 
+#                                        LeaderBrand Produce Ltd. 
+#                                                               5 
+#                                     Learning for Sustainability 
+#                                                               5 
+#              Leather & Shoe Research Association of New Zealand 
+#                                                               5 
+#                                     Leinster Orthopaedic Centre 
+#                                                               7 
+#                                                  Levare Limited 
+#                                                               7 
+#                          Levin and Horowhenua Veterinary Centre 
+#                                                               4 
+#                                           Lewis and Barrow Ltd. 
+#                                                               3 
+#                                                             LIC 
+#                                                               5 
+#                                          Life Technologies Ltd. 
+#                                                               8 
+#                                    LightBox Psychology Services 
+#                                                               8 
+#                                           Lincoln Agritech Ltd. 
+#                                                               3 
+#                                              Lincoln University 
+#                                                               5 
+#                                             Lincolne Scott Ltd. 
+#                                                               8 
+#                                               Lindis Consulting 
+#                                                               3 
+#                                             Linnaeus Laboratory 
+#                                                               9 
+#                                                          Litmus 
+#                                                               7 
+#                                Livestock Solutions and Services 
+#                                                               4 
+#                                Living Cell Technologies NZ Ltd. 
+#                                                               7 
+#                                    Local Government New Zealand 
+#                                                               5 
+#                                                   Logjiztix Ltd 
+#                                                              14 
+#                                                         Lowe NZ 
+#                                                               3 
+#                                      Lucas Industries (NZ) Ltd. 
+#                                                               1 
+#                                       LWT Animal Nutrition Ltd. 
+#                                                               4 
+#                               MacMurray Hypertension Clinic Ltd 
+#                                                               1 
+#                                                           MAGAK 
+#                                                              11 
+#              Magic Sparks Early Learning and Development Centre 
+#                                                               6 
+#                                                Magritek Limited 
+#                                                               1 
+#                                                 Makoura College 
+#                                                               6 
+#                          Malaghan Institute of Medical Research 
+#                                                               7 
+#                            Male Survivors of Sexual Abuse Trust 
+#                                                               8 
+#                                               Manaaki Te Awanui 
+#                                                               3 
+#                       Manaia Health Primary Health Organisation 
+#                                                               9 
+#                                            Manawatu Diagnostics 
+#                                                               4 
+#    Mangere Community Health Trust (Primary Health Organisation) 
+#                                                               7 
+#                                 Manukau Institute of Technology 
+#                                                               8 
+#                                             Manukau SuperClinic 
+#                                                               1 
+#                                           Manurewa South School 
+#                                                               1 
+#                                               Maori Hill Clinic 
+#                                                               2 
+#                                   Maori Pharmacists Association 
+#                                                               7 
+#                                     Maramatanga Consultants Ltd 
+#                                                               4 
+#                      Marine Fisheries Research Services Limited 
+#                                                               3 
+#                                    Marine Wildlife Research Ltd 
+#                                                               3 
+#                                                 Marinoto Clinic 
+#                                                               7 
+#                           Mark L Batchelar Consulting Engineers 
+#                                                               8 
+#                                           Market Economics Ltd. 
+#                                                               4 
+#                                Marlborough Wine Research Center 
+#                                                               9 
+#                                             MARS Bioimaging Ltd 
+#                                                              10 
+#                                     Marshall Day Acoustics Ltd. 
+#                                                               8 
+#                                             Mary Potter Hospice 
+#                                                              10 
+#                                               Massey University 
+#                                                               4 
+#                                         Masters Consulting Ltd. 
+#                                                               3 
+#                                         Matakina Technology Ltd 
+#                                                               4 
+#                                         Matamata Medical Centre 
+#                                                               7 
+#                                Matamata Veterinary Services Ltd 
+#                                                              10 
+#                                                   MBCentury Ltd 
+#                                                               1 
+#                              McConnell Dowell Constructors Ltd. 
+#                                                               1 
+#                                           McLaren Research Ltd. 
+#                                                               5 
+#                                            McManus Geotech Ltd. 
+#                                                               3 
+#                           Medical Council of New Zealand (MCNZ) 
+#                                                               6 
+#                       Medical Research Institute of New Zealand 
+#                                                               7 
+#                                                  Medlab Central 
+#                                                               7 
+#                                                   Melanoma Unit 
+#                                                               7 
+#                 Member International Neuropsychological Society 
+#                                                               2 
+#                         Mental Health Education Resource Centre 
+#                                                               8 
+#                         Mental Health Foundation of New Zealand 
+#                                                               4 
+#                                            MercyAscot Hospitals 
+#                                                               7 
+#                                            Meridian Energy Ltd. 
+#                                                               1 
+#                                                  Mesynthes Ltd. 
+#                                                               6 
+#                      Meteorological Service of New Zealand Ltd. 
+#                                                              14 
+#                                                        Methanex 
+#                                                              11 
+#                                         MetOcean Solutions Ltd. 
+#                                                              11 
+#                                        Microfossil Research Ltd 
+#                                                               3 
+#                                MidCentral District Health Board 
+#                                                               7 
+#                                                     Midland MRI 
+#                                                               3 
+#                              Midland Regional Forensic Services 
+#                                                               1 
+#                                         Midlands Health Network 
+#                                                               7 
+#                                Midwifery Council of New Zealand 
+#                                                               8 
+#                                         Mighty River Power Ltd. 
+#                                                              11 
+#                                              Millar Instruments 
+#                                                               3 
+#                                            Milton Health Centre 
+#                                                               2 
+#                                 Ministry for Primary Industries 
+#                                                               3 
+#                                   Ministry for Primary Industry 
+#                                                               6 
+#                                    Ministry for the Environment 
+#                                                              14 
+#                  Ministry of Business Innovation and Employment 
+#                                                               3 
+#              Ministry of Civil Defence and Emergency Management 
+#                                                               3 
+#                                           Ministry of Education 
+#                                                               6 
+#                           Ministry of Foreign Affairs and Trade 
+#                                                               9 
+#                                              Ministry of Health 
+#                                                               7 
+#                                             Ministry of Justice 
+#                                                               6 
+#                              Ministry of Pacific Island Affairs 
+#                                                               6 
+#                                  Ministry of Social Development 
+#                                                               1 
+#                                           Ministry of Transport 
+#                                                               8 
+#                                  Mission Heights Primary School 
+#                                                               3 
+#                                        MLB Consulting Engineers 
+#                                                               8 
+#                               Molehill Astronomical Observatory 
+#                                                               9 
+#                                        Moorhouse Medical Clinic 
+#                                                               7 
+#                                        Morrison Consultants Ltd 
+#                                                              14 
+#                        Motu Economic and Public Policy Research 
+#                                                               3 
+#                             Mountains to Sea Conservation Trust 
+#                                                               3 
+#                                           MSD Animal Health Ltd 
+#                                                               4 
+#                           Mt. Albert Psychological Services Ltd 
+#                                                               8 
+#                                          Mulgor Consulting Ltd. 
+#                                                               3 
+#                   Muscular Dystrophy Association of New Zealand 
+#                                                               9 
+#                                             MWH New Zealand Ltd 
+#                                                               8 
+#                                              N-Squared Software 
+#                                                               6 
+#                                           NaeNae Medical Centre 
+#                                                               7 
+#                                       National Addiction Centre 
+#                                                               2 
+#                National Association of Steel-Framed Housing Inc 
+#                                                               8 
+#                        National Council of Women of New Zealand 
+#                                                               8 
+#                        National Heart Foundation of New Zealand 
+#                                                               7 
+#   National Library of New Zealand Te Puna Matauranga O Aotearoa 
+#                                                               6 
+#                    National Maori Health Workforce Organisation 
+#                                                               2 
+#                                      Natural Resource Assessors 
+#                                                               3 
+#                                    Needle Exchange Programme NZ 
+#                                                               2 
+#                                          Nelson Forests Limited 
+#                                                               8 
+#                        Nelson Marlborough District Health Board 
+#                                                               7 
+#                                Nelson Marlborough Fish and Game 
+#                                                               3 
+#                      Nelson Marlborough Institute of Technology 
+#                                                               3 
+#                             Nelson Marlborough Regional Council 
+#                                                               5 
+#                                    Neonatal Intensive Care Unit 
+#                                                               2 
+#                                                         NetSafe 
+#                                                               1 
+#                                                        NetValue 
+#                                                              18 
+#                                          Neuren Pharmaceuticals 
+#                                                               1 
+#                          Neurological Foundation of New Zealand 
+#                                                               1 
+#                                        New Brighton Health Care 
+#                                                              10 
+#                                             New Image Group Ltd 
+#                                                               1 
+#                                                   New River Ltd 
+#                                                               2 
+#                                    New Zealand Academy of Sport 
+#                                                               9 
+#                                      New Zealand Aerial Mapping 
+#                                                              14 
+#         New Zealand Agricultural Greenhouse Gas Research Centre 
+#                                                              10 
+#                                   New Zealand Agriseeds Limited 
+#                                                               4 
+#                                     New Zealand AIDS Foundation 
+#                                                               7 
+#                          New Zealand Aluminium Smelters Limited 
+#                                                               1 
+#                                 New Zealand Antarctic Institute 
+#                                                               8 
+#                                              New Zealand Arable 
+#                                                               5 
+#                         New Zealand Association of Optometrists 
+#                                                               6 
+#                         New Zealand Avocado Growers Association 
+#                                                               5 
+#            New Zealand BioSecure Entomology Laboratory Research 
+#                                                               6 
+#                                       New Zealand Blood Service 
+#                                                               7 
+#                            New Zealand Brain Research Institute 
+#                                                               7 
+#                            New Zealand Breast Cancer Foundation 
+#                                                               2 
+#            New Zealand Centre for Conservation Medicine (NZCCM) 
+#                                                               7 
+#                            New Zealand Climate & Health Council 
+#                                                               2 
+#                             New Zealand College of Chiropractic 
+#                                                               1 
+#                                 New Zealand College of Midwives 
+#                                                               8 
+#                               New Zealand Cot Death Association 
+#                                                               1 
+#            New Zealand Council for Educational Research (NZCER) 
+#                                                               4 
+#                                       New Zealand Defence Force 
+#                                                              10 
+#                                  New Zealand Dental Association 
+#                                                               2 
+#  New Zealand Employment Service and Work and Income New Zealand 
+#                                                               8 
+#            New Zealand Familial Gastrointestinal Cancer Service 
+#                                                               7 
+#                                        New Zealand Forestry Ltd 
+#                                                              14 
+#                     New Zealand Geotechnical Society Ine (NZGS) 
+#                                                              15 
+#                                    New Zealand Guidelines Group 
+#                                                               7 
+#                    New Zealand Gynaecological Cancer Foundation 
+#                                                               7 
+#                   New Zealand Heart and Lung Transplant Service 
+#                                                               7 
+#              New Zealand Heavy Engineering Research Association 
+#                                                               8 
+#     New Zealand Homebased Early Childhood Education Association 
+#                                                               2 
+#          New Zealand Institute for Plastic and Cosmetic Surgery 
+#                                                               2 
+#                  New Zealand Institute of Community Health Care 
+#                                                               8 
+#                      New Zealand Institute of Economic Research 
+#                                                               6 
+#             New Zealand Institute of Medical Laboratory Science 
+#                                                               7 
+#                           New Zealand Institute of Rural Health 
+#                                                               2 
+#                                     New Zealand Kiwi Foundation 
+#                                                               1 
+#                                 New Zealand Medical Association 
+#                                                               2 
+#                       New Zealand Medical Students' Association 
+#                                                               1 
+#                                   New Zealand National Eye Bank 
+#                                                               7 
+#                                 New Zealand National LCP Office 
+#                                                               7 
+#                           New Zealand Needle Exchange Programme 
+#                                                               7 
+#                                 New Zealand Nurses Organisation 
+#                                                               9 
+#                                   New Zealand Olympic Committee 
+#                                                               2 
+#             New Zealand Organisation for Rare Disorders (NZORD) 
+#                                                               2 
+#                                          New Zealand Parliament 
+#                                                               6 
+#                                              New Zealand Police 
+#                                                               4 
+#                            New Zealand Qualifications Authority 
+#                                                               6 
+#                                   New Zealand Refining Co. Ltd. 
+#                                                               8 
+#                            New Zealand Rheumatology Association 
+#                                                               7 
+#                                         New Zealand Rugby Union 
+#                                                              16 
+# New Zealand School Acupuncture and Traditional Chinese Medicine 
+#                                                               8 
+#                                     New Zealand School of Music 
+#                                                               6 
+#                        New Zealand Seafood Industry Council Ltd 
+#                                                               3 
+#          New Zealand Society for Earthquake Engineering (NZSEE) 
+#                                                              15 
+#                                        New Zealand Spinal Trust 
+#                                                               2 
+#                                    New Zealand Tertiary College 
+#                                                               9 
+#                                     New Zealand Timberlands Ltd 
+#                                                               8 
+#                                    New Zealand Transport Agency 
+#                                                               8 
+#                                            New Zealand Treasury 
+#                                                               8 
+#                           New Zealand Underwater Heritage Group 
+#                                                               3 
+#                           New Zealand Veterinary Pathology Ltd. 
+#                                                               7 
+#                                         New Zealand Winegrowers 
+#                                                               1 
+#                                          Newman Energy Research 
+#                                                               8 
+#                                          Newtown Medical Centre 
+#                                                               2 
+#                                                  NextWindow Ltd 
+#                                                               2 
+#                                              Ngati Porou Hauora 
+#                                                               1 
+#                                  Ngati Whakaue Tribal Lands Inc 
+#                                                               3 
+#                                                 Nielsen Company 
+#                                                               1 
+#                                    NIU Development Incorporated 
+#                                                               9 
+#                                                            NIWA 
+#                                                               3 
+#                                              Norske Skog Tasman 
+#                                                               1 
+#                             North Canterbury Veterinary Clinics 
+#                                                               5 
+#                                             North Shore Hospice 
+#                                                               7 
+#                               North Shore International Academy 
+#                                                               4 
+#                             Northcott Research Consultants Ltd. 
+#                                                               8 
+#                                         Northern Cancer Network 
+#                                                               7 
+#                                   Northern Region IDEA Services 
+#                                                               1 
+#                                      Northern Regional Alliance 
+#                                                               3 
+#                          Northern Southland Veterinary Services 
+#                                                               5 
+#                                 Northland District Health Board 
+#                                                               7 
+#                                      Northland Regional Council 
+#                                                               5 
+#                                                        NorthTec 
+#                                                               3 
+#                                              Novare Design Ltd. 
+#                                                               8 
+#                                                    Numcore Ltd. 
+#                                                               1 
+#                                                    Numinos Ltd. 
+#                                                               1 
+#                                         Nurse Maude Association 
+#                                                               8 
+#                                       Nutrigenomics New Zealand 
+#                                                               5 
+#                                Nutrition Society of New Zealand 
+#                                                               2 
+#                                                  NZ Oil and Gas 
+#                                                               6 
+#                                         NZ Parsa Tiling Limited 
+#                                                               8 
+#                                               NZFOCUS (NZ) Ltd. 
+#                                                               1 
+#                                                     NZX Limited 
+#                                                               1 
+#                                     O'Kane Consultants (NZ) Ltd 
+#                                                               5 
+#                                                 Oamaru Hospital 
+#                                                               2 
+#                                                   Odyssey House 
+#                                                               1 
+#                Office of the Health and Disability Commissioner 
+#                                                               1 
+#    Office of the Parliamentary Commissioner for the Environment 
+#                                                              10 
+#                                            Omahu Urology Clinic 
+#                                                               2 
+#                                            OMV New Zealand Ltd. 
+#                                                               3 
+#                                           Oncology Surgery Ltd. 
+#                                                               7 
+#                                 Open Polytechnic of New Zealand 
+#                                                               2 
+#                                           OPRA Consulting Group 
+#                                                               8 
+#                                         Optimal Clinical Trials 
+#                                                               6 
+#                              Opus International Consultants Ltd 
+#                                                               3 
+#                                              Oracle New Zealand 
+#                                                               6 
+#                                              Oral Health Centre 
+#                                                               2 
+#                                               Orange Consulting 
+#                                                               2 
+#                                                   Orb Solutions 
+#                                                               6 
+#                                      Organ Donation New Zealand 
+#                                                               9 
+#                                             Oritain Global Ltd. 
+#                                                               2 
+#                           Ornithological Society of New Zealand 
+#                                                              10 
+#                                           Orokonui Ecosanctuary 
+#                                                               6 
+#                                                           OSPRI 
+#                                                               5 
+#                                         Otago Community Hospice 
+#                                                               8 
+#                        Otago Computational Modelling Group Ltd. 
+#                                                               8 
+#                                    Otago Daily Times Collective 
+#                                                               2 
+#                                         Otago Girls High School 
+#                                                               6 
+#                                                    Otago Museum 
+#                                                               3 
+#                                               Otago Polytechnic 
+#                                                               8 
+#                                          Otago Regional Council 
+#                                                               3 
+#                                                 Otahuhu College 
+#                                                               2 
+#                                            Otakaro Pathways Ltd 
+#                                                              10 
+#                                       Otorohanga Dental Surgery 
+#                                                               2 
+#                                                  OTRS Group Ltd 
+#                                                               8 
+#                                      Outome Management Services 
+#                                                               1 
+#                                        P.N. Plimmer and Associ. 
+#                                                               1 
+#                                     PA Handford and Assoc. Ltd. 
+#                                                               3 
+#                                                  Pacific Brands 
+#                                                               1 
+#                                 Pacific Edge Biotechnology Ltd. 
+#                                                               7 
+#              Pacific Health Research and Development Foundation 
+#                                                               4 
+#                                         Pacific Radiology Group 
+#                                                               7 
+#            Pacific Women's Health Research and Development Unit 
+#                                                               7 
+#                                        Pakuranga Medical Centre 
+#                                                               7 
+#                                           Palaecol Research Ltd 
+#                                                               6 
+#                                   Palmerston North City Council 
+#                                                               4 
+#                                   Palmerston North City Library 
+#                                                               6 
+#                                                    Pansophy Ltd 
+#                                                               5 
+#                                    Papamoa Pines Medical Centre 
+#                                                               6 
+#                                             Paraparaumu College 
+#                                                               6 
+#                                                   Paric Limited 
+#                                                               1 
+#                                         Parkinson's New Zealand 
+#                                                               1 
+#                                       Parresia Research Limited 
+#                                                               1 
+#                                            Parsons Brinckerhoff 
+#                                                               1 
+#                                     Pasifika Horizon Healthcare 
+#                                                               1 
+#                                    Pasifika Medical Association 
+#                                                               1 
+#                                           Pasifika Research Ltd 
+#                                                               6 
+#                                                         Pathlab 
+#                                                               7 
+#                                                  Patients First 
+#                                                               7 
+#                                Paton-Simpson Associates Limited 
+#                                                               9 
+#                                    Pattle Delamore Partners Ltd 
+#                                                               8 
+#                                              Pegasus Health Ltd 
+#                                                               8 
+#                                        Penny and Associates Ltd 
+#                                                               7 
+#               Perinatal and Maternal Mortality Review Committee 
+#                                                               7 
+#                                   Petersgate Counselling Centre 
+#                                                               8 
+#                                        PF Olsen and Company Ltd 
+#                                                              14 
+#                                        PGG Wrightson Seeds Ltd. 
+#                                                               5 
+#                                                         PHARMAC 
+#                                                               7 
+#                                              Pharmaceuticol Ltd 
+#                                                               7 
+#                                   Pharmacy Guild of New Zealand 
+#                                                               1 
+#                                       PharmTech Service Limited 
+#                                                               2 
+#                  Philosophy of Education Society of Australasia 
+#                                                               1 
+#                                         Photonz Corporation Ltd 
+#                                                               1 
+#                                                     Pictor Ltd. 
+#                                                               1 
+#                                                 Pingar Research 
+#                                                               3 
+#                                              Pinnacle Group Ltd 
+#                                                              10 
+#                                                PipeTechnologies 
+#                                                               1 
+#                                            Pipfruit New Zealand 
+#                                                               5 
+#                                        Planning Consultants Ltd 
+#                                                               1 
+#                                         Plant and Food Research 
+#                                                               5 
+#                               Plant Protection Chemistry NZ Ltd 
+#                                                               5 
+#                                               PlusGroup Limited 
+#                                                               5 
+#                                                 Pohatu Penguins 
+#                                                               5 
+#                                                 Polybatics Ltd. 
+#                                                               6 
+#                                            Porirua City Council 
+#                                                               2 
+#                                       Ports of Auckland Limited 
+#                                                               1 
+#                                           Positive Thinking Ltd 
+#                                                               1 
+#                                              Possum Observatory 
+#                                                               9 
+#                                   Potter Building Services Ltd. 
+#                                                               4 
+#                                                   Power Co Ltd. 
+#                                                               1 
+#                       Power Systems Consultants New Zealand Ltd 
+#                                                               9 
+#                                               PowerbyProxi Ltd. 
+#                                                               1 
+#                                         Powerhouse Ventures Ltd 
+#                                                              10 
+#                                     Practitioners First Limited 
+#                                                               1 
+#                              Presbyterian Church of New Zealand 
+#                                                               1 
+#                                   PriceWaterhouse Coopers (PwC) 
+#                                                               2 
+#                                Priestley Structural Engineering 
+#                                                               8 
+#                                     Private Endodontic Practice 
+#                                                               2 
+#                                          ProCare Health Limited 
+#                                                               7 
+#                                     Prohealth Physiotherapy Ltd 
+#                                                               1 
+#                                                    Promisia Ltd 
+#                                                               2 
+#                           Proteus Wildlife Research Consultants 
+#                                                               3 
+#                                           Psychological Service 
+#                                                               1 
+#                                               Psychology Centre 
+#                                                               7 
+#                                         Pultron Composites Ltd. 
+#                                                               3 
+#                                                         Pyrotek 
+#                                                               8 
+#                                                      Q-Bit Ltd. 
+#                                                               8 
+#                                                       QE Health 
+#                                                               1 
+#                                                      Qnique Ltd 
+#                                                               6 
+#                                            QStar Solutions Ltd. 
+#                                                               3 
+#                                                       Quadradix 
+#                                                               1 
+#                                        Quay Park Medical Centre 
+#                                                               2 
+#                                           Queens Academic Group 
+#                                                               1 
+#                                      Quest Integrity Group Ltd. 
+#                                                              11 
+#                                          Quigley and Watts Ltd. 
+#                                                              10 
+#                                    Quin Environmentals(NZ) Ltd. 
+#                                                               4 
+#                                  Quintessence Developments Ltd. 
+#                                                               8 
+#                                                      Quit Group 
+#                                                               7 
+#                                   Radiata Pine Breeding Company 
+#                                                               3 
+#                                       Radio Spectrum Management 
+#                                                               6 
+#                                                      Rakon Ltd. 
+#                                                               1 
+#                                        Rangiora New Life School 
+#                                                               2 
+#                         Rape Prevention Education-Whakatu Mauri 
+#                                                               4 
+#                             Rauawaawa Kaumatua Charitable Trust 
+#                                                               2 
+#                                 Raukatauri Music Therapy Centre 
+#                                                               1 
+#                                   Raukura Hauora O Tainui Trust 
+#                                                               1 
+#                                        Rayonier New Zealand Ltd 
+#                                                               8 
+#                               Refugees as Survivors New Zealand 
+#                                                               1 
+#                                   Reid Construction Systems Ltd 
+#                                                               8 
+#                                                Renewable Energy 
+#                                                               3 
+#                                                        Repromed 
+#                                                               7 
+#                                     Reserve Bank of New Zealand 
+#                                                               3 
+#                                         Resilient Organisations 
+#                                                               1 
+#                        Resource Teacher: Learning and Behaviour 
+#                                                               1 
+#                                           Revolution Fibres Ltd 
+#                                                               6 
+#                                                Riccarton Rotary 
+#                                                              17 
+#                         Risk Strategies Research and Consulting 
+#                                                               8 
+#                                              Rivuli Development 
+#                                                               3 
+#                                                 RML Engineering 
+#                                                               3 
+#                                          Roche Products Limited 
+#                                                               1 
+#                                             Rockwell Automation 
+#                                                               1 
+#                                     Rolleston Veterinary Clinic 
+#                                                               3 
+#                                   Ropata Village Medical Centre 
+#                                                               7 
+#                                  Rotorua General Practice Group 
+#                                                               2 
+#                                        Rowe Davies Research Ltd 
+#                                                               1 
+#       Royal Australian and New Zealand College of Psychiatrists 
+#                                                               1 
+#         Royal Forest and Bird Protection Society of New Zealand 
+#                                                               3 
+#              Royal New Zealand College of General Practitioners 
+#                                                               7 
+#                               Royal New Zealand Plunket Society 
+#                                                               6 
+#                                    Royal Society of New Zealand 
+#                                                               2 
+#                       Ruaimoko Productions and Consultancy Ltd. 
+#                                                               2 
+#                                                      Rumenz Ltd 
+#                                                              11 
+#                                                       RuralLink 
+#                                                               3 
+#  [ reached getOption("max.print") -- omitted 511 entries ]
+```
+
+```{r}
+# > s_cfg <- sizes(cfg)
+# > s_cfg
+# Community sizes
+#   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26 
+# 219 144 212 132 141  94 189 120  84  82  28   3   2  15   3   3   2   2   2   2   2   2   2   2   2   2 
+#  27  28  29  30  31  32  33  34  35  36 
+#   2   2   2   2   2   2   2   2   2   2 
+```
+
+```{r}
+# > ms_cfg <- modularity(cfg)
+# > ms_cfg
+# [1] 0.5310055
+```
+
+```{r}
+plot(cfg, net)
+```
+
+```{r}
+compare(ceb, cfg)
+```
+
+```{r}
+# get_communities <- function(igraph_network, cluster_method = NULL){
+#   if(is.null(cluster_method)) { stop("no method specificied") }
+#   community_object <- do.call(cluster_method, list(igraph_network))
+#   return(tibble(Ind = community_object$names,
+#                 Ind_Cluster = community_object$membership,
+#                 global_modularity = modularity(igraph_network,
+#                                                community_object$membership,
+#                                                weights = E(igraph_network)$weight),
+#                 method = cluster_method) %>% 
+#            arrange(Ind))
+# }
+```
+
+```{r}
+####
+```
+
+
+### Задание 4
+В задании 4 нам предлагается рассчитать ассортативность и гомофилию для графа. 
+
+```{r}
+assortativity_nominal(net_inv, V(net_inv)$type, directed=F)
+```
+
+```{r}
+assortativity(net_inv, V(net_inv)$type, directed=F)
+```
