@@ -3,13 +3,13 @@
 Что нужно сделать:
 - [ ] Задание 1:
 	- [x] выбрать датасет
-	- [ ] прочитать [статью](https://www.researchgate.net/publication/319552932_Analysing_Scientific_Collaborations_of_New_Zealand_Institutions_using_Scopus_Bibliometric_Data) по выбранному датасету
+	- [x] прочитать [статью](https://www.researchgate.net/publication/319552932_Analysing_Scientific_Collaborations_of_New_Zealand_Institutions_using_Scopus_Bibliometric_Data) по выбранному датасету
 	- [ ] сформулировать исследовательский вопрос
 	- [ ] описание графа: направленный или нет и т.п.
 - [ ] Задание 2:
 	- [ ] визуализация
-	- [ ] рассчитать базовые параметры графа?
- 	- [ ] сравнить фактические характеристики с модельными/ теоретическими
+	- [x] рассчитать базовые параметры графа?
+ 	- [x] сравнить фактические характеристики с модельными/ теоретическими
   	- [ ] выводы
 - [ ] Задание 3:
 	- [ ] меры центральности вершин
