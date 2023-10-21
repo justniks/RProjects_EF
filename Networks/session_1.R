@@ -340,8 +340,15 @@ V(karate)$name <- seq(from = 1, to = 34)
 edgeList <- as_edgelist(karate)
 faction <- matrix(c(V(karate)$name, V(karate)$Faction), nrow = 34, ncol = 2)
 FromLabel <- as.numeric(faction[match(as.numeric(edgeList[,1]), as.numeric(faction[,1])), 2]) # match(x, y) returns a vector with the location of x in y
-ToLabel <- as.numeric(faction[match(as.numeric(edgeList[,2]), as.numeric(faction[,1])), 2]) 
+FromLabel
+ToLabel <- as.numeric(faction[match(as.numeric(edgeList[,2]), as.numeric(faction[,1])), 2])
+ToLabel
 edgeType <- FromLabel + ToLabel
+edgeType
+
+faction
+table(as.numeric(faction))
+faction[,2]
 
 table(edgeType)
 table(as.numeric(faction[,2]))
@@ -405,6 +412,7 @@ plot(ceb, karate)
 membership(ceb) 
 sizes(ceb)
 modularity(ceb)
+plot(karate)
 
 # High modularity for a partitioning reflects dense connections within communities 
 # and sparse connections across communities.
