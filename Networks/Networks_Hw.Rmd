@@ -136,6 +136,64 @@ assort_deg
 
 Ассортативность по степени вершины составляет примерно `r round(assort_deg, 3)`, что говорит о предпочтительном присоединении узлов к вершинам с относительно небольшим количеством соседей.
 
+```{r}
+p <- edge_density(net_inv)
+p # 0.003745601
+n_c <- sum( V(net_inv)$type == 'Higher Education' )
+n_c # 54
+exp_diad_uni <- n_c * (n_c - 1) / 2 * p
+exp_diad_uni # 5.359955
+
+unis <- V(net_inv)[which( V(net_inv)$type == 'Higher Education' )]
+unis <- names(unis)
+unis
+
+m_c <- 0
+
+for (row in 1:nrow(edges_inv)) {
+  from_obj <- edges_inv[row, 'from']
+  to_obj <- edges_inv[row, 'to']
+  
+  if ( (from_obj %in% unis) && (to_obj %in% unis) ) {
+    m_c <- m_c + 1
+  }
+}
+
+m_c # 172
+
+diadicity_uni <- m_c / exp_diad_uni 
+diadicity_uni # 32.08982
+```
+
+```{r}
+n_c # 54
+p # 0.003745601
+n_nc <- sum( V(net_inv)$type != 'Higher Education' )
+n_nc # 1457
+
+exp_hetero_uni <- n_nc * n_c * p
+exp_hetero_uni # 294.6964
+
+m_mixed <- 0
+
+for (row in 1:nrow(edges_inv)) {
+  from_obj <- edges_inv[row, 'from']
+  to_obj <- edges_inv[row, 'to']
+  
+  if ( (from_obj %in% unis) && !(to_obj %in% unis) ) {
+    m_mixed <- m_mixed + 1
+  }
+  if ( !(from_obj %in% unis) && (to_obj %in% unis) ) {
+    m_mixed <- m_mixed + 1
+  }
+}
+
+m_mixed # 2051
+
+heterophilicity_uni <- m_mixed / exp_hetero_uni
+heterophilicity_uni # 6.959706
+```
+
 Выводы по Заданию 4: ...
 
 ### Задание 5
