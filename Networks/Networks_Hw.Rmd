@@ -1,9 +1,9 @@
 ---
 title: "Дз по Сетевым моделям"
 output:
-  pdf_document: default
-  author: "Кабанов Илья, Сухов Александр, Сысоев Никита"
   html_notebook: default
+  author: "Кабанов Илья, Сухов Александр, Сысоев Никита"
+  pdf_document: default
 ---
 
 ## Подготовительные шаги
@@ -13,7 +13,7 @@ output:
 setwd("~/Documents/GitHub/RProjects_EF/Networks")
 ```
 
-```{r}
+```{r, echo=FALSE, message=FALSE}
 # Подгрузим необходимые для дальнейшего анализа библиотеки
 ## install.packages("igraph")
 ## install.packages("igraphdata")
@@ -259,58 +259,11 @@ hist(number_of_components, xlim=range(c(0, 25)))
 abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
 ```
 
-```{r}
-# Генерируем модель Барабаши-Альберта
-#Ищем оптимальное значение power
-model <- vector('list', 100)
-res <- rep(NA, 40)
-m <- rep(NA, 100)
-d <- rep(NA, 100)
-for (i in c(1:40)){
-  model[[i]] <- sample_pa(n = gorder(net), power = i/10, directed = FALSE)
-  m[i] <- mean_distance(model[[i]])
-  d[i] <- diameter(model[[i]])
-  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
-}
-
-plot(x=c(1:40)/10, y=res)
-#power=2.15
-
-random_model <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
-par(mfrow = c(1, 2))
-hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
-hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
-par(mfrow = c(1, 1))
-
-gl <- vector('list', 100)
-m <- rep(NA, 100)
-d <- rep(NA, 100)
-a <- rep(NA, 100)
-for (i in 1:100){
-  gl[[i]] <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
-  m[i] <- mean_distance(gl[[i]])
-  d[i] <- diameter(gl[[i]])
-  a[i] <- igraph::components(gl[[i]])$no
-}
-mean_distance <- m
-hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
-abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
-
-diameter <- d
-hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
-abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
-
-number_of_components <- a
-hist(number_of_components, xlim=range(c(0, 25)))
-abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
-```
-
 **Аналогично предыдущему случаю, данная модель плохо описывает структуру нашего графа.** Значимо совпадает лишь диаметр, так как по нему в том числе происходил подбор гиперпараметра.
 
 Рассмотрим также **схожесть с моделью Барабаши-Альберта**, включающей предпочтительное присоединение к наиболее центральным вершинам.
 
 ```{r}
-
 # Генерируем модель Барабаши-Альберта
 #Ищем оптимальное значение power
 model <- vector('list', 100)
@@ -368,9 +321,7 @@ abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
 
 В этом задании нам предлагается посчитать различные меры *центральности вершин* и сделать содержательные выводы на основе полученных расчетов.
 
-Замечание
-
-:   Для анализа используем обратные веса, т.к. их использование делает осмысленным расчет центральности по близости и кратчайшему пути, но не искажает остальных мер центральности вершин.
+Замечание: Для анализа используем обратные веса, т.к. их использование делает осмысленным расчет центральности по близости и кратчайшему пути, но не искажает остальных мер центральности вершин.
 
 #### Центральность по степени
 
@@ -407,7 +358,7 @@ top_10_degree # в топе - 7 университетов, 3 гос. учреж
 
 ```{r}
 clos1 <- closeness(net, weights=NA) # Первый способ - без учета весов
-clos1
+# clos1
 
 plot(net, vertex.label=NA, layout=layout_with_fr, vertex.size=clos1 * 50)
 ```
@@ -425,7 +376,7 @@ clos1["University of Auckland"]
 
 ```{r}
 clos2 <- closeness(net)
-clos2
+# clos2
 
 plot(net, vertex.label=NA, layout=layout_with_fr, vertex.size=clos2 * 50)
 ```
@@ -476,7 +427,7 @@ betw2["University of Auckland"]
 
 ```{r}
 eig1 <- eigen_centrality(net, weights = NA)
-head(eig1)
+# head(eig1)
 
 top_10_eig1 <- tail(sort(eig1$vector), 10)
 top_10_eig1
@@ -487,7 +438,7 @@ bottom_10_eig1
 
 ```{r}
 eig2 <- eigen_centrality(net)
-head(eig2)
+# head(eig2)
 
 top_10_eig2 <- tail(sort(eig2$vector),10)
 top_10_eig2
@@ -594,9 +545,7 @@ assort_deg
 
 Нами было принято решение рассчитать *dyadicity* (ее посчитаем только для одного случая, т.к. она не будет меняться при различных разбиениях) и *heterophilicity* учреждений высшего образования для следующих разделений на подгруппы: - `Higher Education` vs все остальные - `Higher Education` vs `Business Enterprise` - `Higher Education` vs `Government`.
 
-<ins>Замечание:</ins>
-
-Влиянием `Private not for profit` можно пренебречь.
+Замечание: Влиянием `Private not for profit` можно пренебречь.
 
 #### `Higher Education` vs все остальные
 
