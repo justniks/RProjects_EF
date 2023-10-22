@@ -1,0 +1,359 @@
+---
+title: "R Notebook"
+output:
+  html_notebook: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Введение, описание датасета, чем он хорош. Описание работы. Исследовательский вопрос.
+
+Скачиваем нужные пакеты и открываем их.
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(igraph);
+library(igraphdata);
+library(ggraph);
+library(tidygraph);
+```
+
+Импортируем файл и формируем датасеты с вершинами и ребрами.
+
+```{r}
+edges <- read.csv("edges_1.csv", header=T) 
+colnames(edges) <- c('from', 'to', 'type1', 'type2', 'weight')
+nodes <- unique(edges[c('from', 'type1')])
+more_nodes <- unique(edges[c('to', 'type2')])
+colnames(nodes) <- c('organisation', 'type')
+colnames(more_nodes) <- c('organisation', 'type')
+nodes <- rbind(nodes, more_nodes)
+nodes <- unique(nodes[c('organisation', 'type')])
+rownames(nodes) <- NULL
+edges <- edges[c('from', 'to', 'weight')]
+net <- graph_from_data_frame(d=edges, vertices=nodes, directed=F)
+
+```
+
+При использовании нескольких пакетов для работы с графами не оказалось возможным интерпретируемо визуализировать граф полностью. Поэтому для отображения структуры нашей сети найдем 100 самых центральных по степени вершин и представим связи между ними при помощи пакета 'ggraph'.
+
+```{r}
+V(net)$degrees <- degree(net)
+nodes$degrees <- V(net)$degrees
+
+for_vis_n <- nodes[order(-nodes$degrees),][1:100, 1:2]
+for_vis_e <- edges[(edges$from %in% for_vis_n$organisation & edges$to %in% for_vis_n$organisation),]
+
+for_vis_net <- graph_from_data_frame(d=for_vis_e, vertices=for_vis_n, directed=F)
+V(for_vis_net)$degrees <- degree(for_vis_net)
+
+for_vis_net %>%
+  ggraph(layout='graphopt') +
+  geom_node_point(aes(color = type, size=round(degrees/20))) +
+  geom_edge_link(alpha = 0.05) +
+  theme_void() +
+  ggtitle("Network of New Zealand organisations")
+```
+
+Как можно увидеть, среди 100 самых центральных вершин с количественной точки зрения преобладают организации государственного сектора, однако самыми крупными здесь являются новозеландские университеты. Первые 5 мест по числу совместных научных работ принадлежат именно им, лидером по данному показателю является Университет Окленда, самый крупный и престижный университет Новой Зеландии.
+
+Рассчитаем базовые параметры нашего графа. Так как весами дуг в данном случае является число совместных работ, то есть "сила связи" двух вершин, будем использовать обратные веса для подсчета центральностей через кратчайшие пути. Это довольно разумно, так как от написания дополнительной общей работы прирост в силе связи двух организаций должен монотонно снижаться, как и разница в пути до соседа.
+
+```{r}
+#Считаем базовые параметры графа
+edges$weight <- 1/edges$weight
+net <- graph_from_data_frame(d=edges, vertices=nodes, directed=F)
+# Density
+# The proportion of present edges from all possible ties.
+p <- edge_density(net)
+
+# связность сети
+no <- igraph::components(net)$no # в пакете statnet такое же название
+csize <- igraph::components(net)$csize
+csize
+
+
+# Diameter (longest geodesic distance) (если несколько компонент, то диаметр самой большой)
+# Note that edge weights are used by default, unless set to NA.
+diam <- diameter(net, weights=NA)
+diam_w <- diameter(net)
+path <- get_diameter(net, weights=NA)
+path_w <- get_diameter(net)
+path
+path_w
+
+# рассчитаем кратчайшие пути
+# Average path length 
+# The mean of the shortest distance between each pair of nodes in the network 
+# (in both directions for directed graphs). 
+m_dist <- mean_distance(net, weights=NA)
+m_dist_w <- mean_distance(net)
+```
+
+Плотность нашего графа составляет `r round(p, 4)` . Такая низкая плотность (вероятность образования связи) довольно естественная для вероятности написания научной работы. Наша сеть имеет `r no` компонент связности: одна главная, соединяющая практически все вершины, а все остальные имеют по 2-3 вершины. Диаметр (наибольший из кратчаших путей) имеет длину `r round(diam_w, 2)`, или `r diam`, если брать единичные веса для всех дуг.
+
+Изучим соседство самой центральной веришны, Окледнского Университета, с кем чаще всего взаимодействует наиболее престижный ВУЗ страны.
+
+```{r}
+# We can also easily identify the immediate neighbors of a vertex.
+# The 'neighbors' function finds all nodes one step out from the focal actor.
+# To find the neighbors for multiple nodes, use 'adjacent_vertices()'.
+d <- data.frame(neighbors(net, V(net)["University of Auckland"], mode="total")$type)
+groups <- as.data.frame(table(d))[, 2]
+pie(groups, labels=paste0(as.data.frame(table(d))[, 1], ', ',round(groups/sum(groups)*100, digits=1), '%'), 
+    col=c(5, 2, 3, 4), main='Neighbors of University of Auckland')
+
+```
+
+```{r}
+# To find node neighborhoods going more than one step out, use function 'ego()'
+# with parameter 'order' set to the number of steps out to go from the focal node(s).
+neigh2 <- data.frame(ego(net, order = 2, nodes = V(net)["University of Auckland"])[[1]]$type)
+groups2 <- as.data.frame(table(neigh2))[, 2]
+pie(groups2, labels=paste0(as.data.frame(table(neigh2))[, 1], ', ',round(groups2/sum(groups2)*100, digits=1), '%'), 
+    col=c(5, 2, 3, 4), main='Two-step neighbors of University of Auckland')
+```
+
+Довольно ожидаемо, что чаще всего в написании научных работ такой успешный университет сотрудничает с индустрией. Это подтвеждает наше предположение о том, успех научной работы зависит от работы с бизнесом. В ближайшем окружении данной организации также принято вести исследования с индустрией.
+
+Сравним нашу сеть с теоритическими моделями случайного графа на основе распределения числа их соседей, диаметра, среднего кратчайшего пути и числа компонент связности. Начнем с модели случайного графа Эрдеша-Реньи.
+
+```{r}
+#Генерируем модели случайного графа erdos.renyi
+p <- edge_density(net)
+
+random_model <- erdos.renyi.game(n=gorder(net), p.or.m=p, type='gnp')
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- erdos.renyi.game(n=gorder(net), p.or.m=p, type='gnp')
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+Как можно заметить, все рассматриваемые показатели нашей сети значимо отличаются от модельных, значит, структуру нашей сети нельзя описать данным образом.
+
+Обратимся к модели "малого мира" с регулярной решеткой. Однако в этом случае сперва нужно подобрать гиперпараметр - доля переприсоединенных дуг.
+
+```{r}
+#Генерируем модели случайного графа с регулярной решеткой
+n_of_nei <- mean(degree(net))
+diam_net <- diameter(net, weights=NA)
+#Ищем оптимальное значение p
+mean_dist_net <- mean_distance(net)
+model <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+res <- rep(NA, 100)
+for (i in 1:100){
+  model[[i]] <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = i/100)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+# p = 0.99
+
+random_model <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = 0.99)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 30)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 30)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = 0.99)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+```{r}
+# Генерируем модель Барабаши-Альберта
+#Ищем оптимальное значение power
+model <- vector('list', 100)
+res <- rep(NA, 40)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+for (i in c(1:40)){
+  model[[i]] <- sample_pa(n = gorder(net), power = i/10, directed = FALSE)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+plot(x=c(1:40)/10, y=res)
+#power=2.15
+
+random_model <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+Аналогично предыдущему случаю, данная модель плохо описывает структуры нашего графа. Значимо совпадает лишь диаметр, так как по нему в том числе происходил подбор гиперпараметра.
+
+Также рассмотрим и схожесть с моделью Барабаши-Альберта, включающая предпочтительное присоединение к наиболее центральным вершинам.
+
+```{r}
+
+# Генерируем модель Барабаши-Альберта
+#Ищем оптимальное значение power
+model <- vector('list', 100)
+res <- rep(NA, 40)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+for (i in c(1:40)){
+  model[[i]] <- sample_pa(n = gorder(net), power = i/10, directed = FALSE)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+#power=2.15
+
+random_model <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+
+```
+
+Как мы получили, данная модель тоже не подходит для описания структуры новозеландской сети: все статистически значимо отличается, кроме параметра, по которому проходил подбор гиперпараметра.
+
+\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+
+Задание 6.
+
+Изначально был поставлен исследовательский вопрос, насколько активно при написании научных работ университеты Новой Зеландии взаимодействуют с другими типами организаций, нужно ли им как-то в этом способстовать из вне, например, создавать общие лаботарии с индустриальными корпорациями и государственными органами. Помимо результатов гомофилии и различных видов центральностей, для ответа на заданный вопрос нам может помочь следующая модель предсказания класса вершин.
+
+Разделим все вершины на 2 класса: "1" - университет, "0" - иначе. Отберем из каждого класса по по 10 вершин и положим вероятности их принадлежности к первому классу, они будут соответственно 1 и 0. Для всех остальных вершин положим эту вероятность равную 0.5. При каждой итерации будем обновлять вероятности каждой вершины исходя из вероятностей её соседей. В итоге, после 10 таких итераций получим для каждой вершины вероятность её принадлежности классу 1, и классифицируем её по порогу 0.5
+
+Для избежания случайности повторим этот алгоритм сто раз и построим гистограмму числа полученных университетов (вершин класса "1"), а также гистрограмму средних вероятностей принадлежности группе университетов.
+
+```{r}
+for (j in 1:20){ 
+  network <- net
+  V(network)[which(V(network)$type == 'Higher Education')]$type = 1
+  V(network)[which(V(network)$type != 1)]$type = 0
+  
+  
+  # вероятность вершины перейти в класс churn = 1 равна доле соседей churn = 1 от общего числа соседей
+  # используем матричные вычисления
+  random_uni <- sample(V(network)[which(V(network)$type == 1)], 10)
+  random_not_uni <- sample(V(network)[which(V(network)$type == 0)], 10)
+  
+  
+  for (i in 1:1511){
+    if (!(V(network)[i] %in% random_uni | (V(network)[i] %in% random_not_uni))){
+      V(network)$type[i] = 0.5
+    }
+  }
+  
+  UniProb <-  as.numeric(V(network)$type)
+  threshold <- 0.5
+  A <- as_adjacency_matrix(network)
+  A <- as.matrix(A)
+  Neighbors <- rowSums(A) # общее число соседей вершины
+  
+  UniProb_iter <- UniProb
+  for(i in 1:10){
+    UniProb_iter <- as.vector((A %*% UniProb_iter) / Neighbors)
+  }
+  res[i] <- length(which(UniProb_iter > threshold))
+  pr[j] <- mean(UniProb_iter)
+}
+```
+
+```{r}
+hist(res, main= 'Число предсказанных университетов')
+hist(pr, main='Средняя вероятность принадлежности классу 1')
+```
+
+Как можно увидеть, почти во всех случаях абсолютное число вершин были предсказаны в качестве университетов. Получили: какие бы 10 университетов мы ни взяли, их класс дойдет до большинства вершин быстрее, чем противоположный класс 10 случайных вершин. Это распространяется и на случай, когда были выбраны наименее центральные университеты. Если бы университеты были бы плохо связаны с другими организациями, то их класс намного слабее распространялся на вершины другого типа, а это не так. Значит, по крайней мере, хотя бы какие-то университеты (наиболее центральные) довольно активно кооперируются с другими организациями (как, например, это делает Олклендский университет). Значит, для таких университетов нет необходимости строить совместные с бизнесом и государством научные центры. Вспомним про высокий показатель диадности у ВУЗов, выходит, что он получается таким большим из-за высокой гомофилии у более мелких учебных заведений, можно предположить, что именно они плохо взаимодействуют с бизнесом и гос органами. Как тогда можно им помочь? При моделировании их класс распростанялся по сети через их соседей - крупных университетов. В таком случае, более разумно строить научные центры именно соединяющие мелкие университеты с крупными. Данным образом, казалось бы, усиливая гомофилию, мы, наоборот, будем способстовать развитию научных отношений университетов с другими копорациями.
