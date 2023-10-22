@@ -17,33 +17,23 @@ setwd("~/Documents/GitHub/RProjects_EF/Networks")
 # Подгрузим необходимые для дальнейшего анализа библиотеки
 ## install.packages("igraph")
 ## install.packages("igraphdata")
-## install.packages("network") 
-## install.packages("tidygraph")
 ## install.packages("ggraph")
-## install.packages("visNetwork")
-## install.packages("threejs")
-## install.packages("networkD3")
-## install.packages("DigrammeR")
+## install.packages("tidygraph")
+## install.packages("DescTools")
 
 
 library(igraph);
 library(igraphdata);
-# library(intergraph);
-library(network);
-library(tidygraph);
 library(ggraph);
-library(visNetwork);
-library(threejs);
-library(networkD3);
-# library(DigrammeR);
+library(tidygraph);
+library(DescTools);
 ```
 
 ## Обработка данных и создание графа
 
 ```{r}
-# Загрузим данные для исследования
+# Загрузим данные для исследования: набор ребер и вершин
 edges <- read.csv("edges_1.csv", header=T) 
-# edges <- edges[1:500, ]
 colnames(edges) <- c('from', 'to', 'type1', 'type2', 'weight')
 
 nodes <- unique(edges[c('from', 'type1')])
@@ -57,102 +47,546 @@ nodes <- unique(nodes[c('organisation', 'type')])
 rownames(nodes) <- NULL
 edges <- edges[c('from', 'to', 'weight')]
 
-# Создадим также набор обратных величин для весов ребер (это пригодится нам в дальнейшем)
-edges_inv <- edges
-edges_inv$weight <- 1 / edges_inv$weight
+# Создадим также набор обратных величин для весов ребер (это пригодится нам в дальнейшем). Исходные веса нам уже не понадобятся
+edges$weight <- 1 / edges$weight
 
 net <- graph_from_data_frame(d=edges, vertices=nodes, directed=F)
-net_inv <- graph_from_data_frame(d=edges_inv, vertices=nodes, directed=F)
-# направленный граф нужен для визуализации графа при помощи пакета ggraph
-net_directed <- graph_from_data_frame(d=edges, vertices=nodes, directed=T)
 
-V(net_inv)$color <- ifelse( V(net_inv)$type=="Business Enterprise", "red", 
-  ifelse( V(net_inv)$type=="Private not for profit", "purple", 
-    ifelse( V(net_inv)$type=="Government", "green", 
-      ifelse( V(net_inv)$type=="Higher Education", "blue", "black") 
+V(net)$color <- ifelse( V(net)$type=="Business Enterprise", "red", 
+  ifelse( V(net)$type=="Private not for profit", "purple", 
+    ifelse( V(net)$type=="Government", "green", 
+      ifelse( V(net)$type=="Higher Education", "blue", "black") 
     ) 
   ) 
 )
-head(V(net_inv)$color, 10)
+head(V(net)$color, 10)
 ```
+
+**Поясним, почему в дальнейшем будем работать именно с обратными весами:**
+Кратчайший путь и кратчайшее расстояние в данной задаче будут представлять собой не то же самое, что и в задаче с издержками перевозок или длинами расстояний между вершинами в качестве весов ребер. 
+Отрицательные веса мы не используем, потому что *алгоритм Дейкстры* работает с неотрицательными весами ребер, поэтому далее мы оперируем с обратными весами, т.к., на наш взгляд, этот выбор является наиболее оптимальным для преодоления возникших трудностей. 
+
 
 ## Исследовательский вопрос
 
 Исследовательский вопрос: ...
 
 ## Анализ датасета
+### Задание 2
+При использовании нескольких пакетов для работы с графами не оказалось возможным интерпретируемо визуализировать граф полностью. Поэтому для отображения структуры нашей сети найдем 100 самых центральных по степени вершин и представим связи между ними при помощи пакета `ggraph`.
+
+```{r}
+V(net)$degrees <- degree(net)
+nodes$degrees <- V(net)$degrees
+
+for_vis_n <- nodes[order(-nodes$degrees),][1:100, 1:2]
+for_vis_e <- edges[(edges$from %in% for_vis_n$organisation & edges$to %in% for_vis_n$organisation),]
+
+for_vis_net <- graph_from_data_frame(d=for_vis_e, vertices=for_vis_n, directed=F)
+V(for_vis_net)$degrees <- degree(for_vis_net)
+
+for_vis_net %>%
+  ggraph(layout='graphopt') +
+  geom_node_point(aes(color = type, size=round(degrees/20))) +
+  geom_edge_link(alpha = 0.05) +
+  theme_void() +
+  ggtitle("Network of New Zealand organisations")
+```
+
+Как можно увидеть, среди 100 самых центральных вершин с количественной точки зрения преобладают организации государственного сектора, однако самыми крупными здесь являются новозеландские университеты. Первые 5 мест по числу совместных научных работ принадлежат именно им, лидером по данному показателю является *Университет Окленда*, самый крупный и престижный университет Новой Зеландии.
+
+Рассчитаем **базовые параметры** нашего графа. Так как весами дуг в данном случае является число совместных работ, то есть "сила связи" двух вершин, будем использовать обратные веса для подсчета центральностей через кратчайшие пути. Это довольно разумно, так как от написания дополнительной общей работы прирост в силе связи двух организаций должен монотонно снижаться, как и разница в пути до соседа.
+
+```{r}
+#Считаем базовые параметры графа
+
+# Density
+# The proportion of present edges from all possible ties.
+p <- edge_density(net)
+
+# связность сети
+no <- igraph::components(net)$no # в пакете statnet такое же название
+csize <- igraph::components(net)$csize
+csize
+
+
+# Diameter (longest geodesic distance) (если несколько компонент, то диаметр самой большой)
+# Note that edge weights are used by default, unless set to NA.
+diam <- diameter(net, weights=NA)
+diam_w <- diameter(net)
+path <- get_diameter(net, weights=NA)
+path_w <- get_diameter(net)
+path
+path_w
+
+# рассчитаем кратчайшие пути
+# Average path length 
+# The mean of the shortest distance between each pair of nodes in the network 
+# (in both directions for directed graphs). 
+m_dist <- mean_distance(net, weights=NA)
+m_dist_w <- mean_distance(net)
+```
+
+Плотность нашего графа составляет `r round(p, 4)`. Такая низкая плотность (вероятность образования связи) довольно естественная для вероятности написания научной работы. Наша сеть имеет `r no` компонент связности: одна главная, соединяющая практически все вершины, а все остальные имеют по 2-3 вершины. Диаметр (наибольший из кратчаших путей) имеет длину `r round(diam_w, 2)`, или `r diam`, если брать единичные веса для всех дуг.
+
+**Изучим соседство самой центральной вершины &mdash; Оклендского Университета** (с кем чаще всего взаимодействует наиболее престижный ВУЗ страны):
+
+```{r}
+# We can also easily identify the immediate neighbors of a vertex.
+# The 'neighbors' function finds all nodes one step out from the focal actor.
+# To find the neighbors for multiple nodes, use 'adjacent_vertices()'.
+d <- data.frame(neighbors(net, V(net)["University of Auckland"], mode="total")$type)
+groups <- as.data.frame(table(d))[, 2]
+pie(groups, labels=paste0(as.data.frame(table(d))[, 1], ', ',round(groups/sum(groups)*100, digits=1), '%'), 
+    col=c(5, 2, 3, 4), main='Neighbors of University of Auckland')
+
+```
+
+```{r}
+# To find node neighborhoods going more than one step out, use function 'ego()'
+# with parameter 'order' set to the number of steps out to go from the focal node(s).
+neigh2 <- data.frame(ego(net, order = 2, nodes = V(net)["University of Auckland"])[[1]]$type)
+groups2 <- as.data.frame(table(neigh2))[, 2]
+pie(groups2, labels=paste0(as.data.frame(table(neigh2))[, 1], ', ',round(groups2/sum(groups2)*100, digits=1), '%'), 
+    col=c(5, 2, 3, 4), main='Two-step neighbors of University of Auckland')
+```
+
+Довольно ожидаемо, что чаще всего в написании научных работ такой успешный университет сотрудничает с индустрией. **Это подтвеждает наше предположение о том, успех научной работы зависит от работы с бизнесом.** В ближайшем окружении данной организации также принято вести исследования с индустрией.
+
+**Сравним нашу сеть с теоритическими моделями случайного графа** на основе *распределения числа их соседей*, *диаметра*, с*реднего кратчайшего пути* и *числа компонент связности*. Начнем с модели случайного графа *Эрдеша-Реньи*.
+
+```{r}
+#Генерируем модели случайного графа erdos.renyi
+p <- edge_density(net)
+
+random_model <- erdos.renyi.game(n=gorder(net), p.or.m=p, type='gnp')
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- erdos.renyi.game(n=gorder(net), p.or.m=p, type='gnp')
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+Как можно заметить, **все рассматриваемые показатели нашей сети значимо отличаются от модельных**, значит, структуру нашей сети нельзя описать данным образом.
+
+**Обратимся к модели "Малого мира"** с регулярной решеткой. Однако в этом случае сперва нужно подобрать гиперпараметр &mdash; долю переприсоединенных дуг.
+
+```{r}
+#Генерируем модели случайного графа с регулярной решеткой
+n_of_nei <- mean(degree(net))
+diam_net <- diameter(net, weights=NA)
+#Ищем оптимальное значение p
+mean_dist_net <- mean_distance(net)
+model <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+res <- rep(NA, 100)
+for (i in 1:100){
+  model[[i]] <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = i/100)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+# p = 0.99
+
+random_model <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = 0.99)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 30)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 30)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_smallworld(dim = 1, size = gorder(net), nei = n_of_nei, p = 0.99)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+```{r}
+# Генерируем модель Барабаши-Альберта
+#Ищем оптимальное значение power
+model <- vector('list', 100)
+res <- rep(NA, 40)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+for (i in c(1:40)){
+  model[[i]] <- sample_pa(n = gorder(net), power = i/10, directed = FALSE)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+plot(x=c(1:40)/10, y=res)
+#power=2.15
+
+random_model <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+```
+
+**Аналогично предыдущему случаю, данная модель плохо описывает структуру нашего графа.** Значимо совпадает лишь диаметр, так как по нему в том числе происходил подбор гиперпараметра.
+
+Рассмотрим также **схожесть с моделью Барабаши-Альберта**, включающей предпочтительное присоединение к наиболее центральным вершинам.
+
+```{r}
+
+# Генерируем модель Барабаши-Альберта
+#Ищем оптимальное значение power
+model <- vector('list', 100)
+res <- rep(NA, 40)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+for (i in c(1:40)){
+  model[[i]] <- sample_pa(n = gorder(net), power = i/10, directed = FALSE)
+  m[i] <- mean_distance(model[[i]])
+  d[i] <- diameter(model[[i]])
+  res[i] <- ((m[i]-mean_dist_net)^2+(d[i]-diam_net)^2)^(1/2) 
+}
+
+#power=2.15
+
+random_model <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+par(mfrow = c(1, 2))
+hist(degree(net), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+hist(degree(random_model), main = "Histogram of node degree", breaks = 1:vcount(net)-1, prob = TRUE, xlim=range(c(0, 20)))
+par(mfrow = c(1, 1))
+
+gl <- vector('list', 100)
+m <- rep(NA, 100)
+d <- rep(NA, 100)
+a <- rep(NA, 100)
+for (i in 1:100){
+  gl[[i]] <- sample_pa(n = gorder(net), power = 2.15, directed = FALSE)
+  m[i] <- mean_distance(gl[[i]])
+  d[i] <- diameter(gl[[i]])
+  a[i] <- igraph::components(gl[[i]])$no
+}
+mean_distance <- m
+hist(mean_distance, xlim=range(c(min(m, mean_distance(net)), max(m, mean_distance(net)))))
+abline(v=mean_distance(net), col='red', lty=3, lwd=2) 
+
+diameter <- d
+hist(diameter, xlim=range(c(min(d, diameter(net, weights=NA)), max(d, diameter(net, weights=NA)))))
+abline(v=diameter(net, weights=NA), col='red', lty=3, lwd=2) 
+
+number_of_components <- a
+hist(number_of_components, xlim=range(c(0, 25)))
+abline(v=igraph::components(net)$no, col='red', lty=3, lwd=2)
+
+```
+
+Как мы получили, данная модель тоже не подходит для описания структуры новозеландской сети: все статистически значимо отличается, кроме параметра, по которому проходил подбор гиперпараметра.
+
+#### Выводы
+**Выводы по *Заданию 2*:** Ни одна из теоретических моделей, известных нам, не описывает структуры нашего графа достаточно точно. 
+
+
+### Задание 3
+В этом задании нам предлагается посчитать различные меры *центральности вершин* и сделать содержательные выводы на основе полученных расчетов.
+
+<ins>Замечание</ins>: Для анализа используем обратные веса, т.к. их использование делает осмысленным расчет центральности по близости и кратчайшему пути, но не искажает остальных мер центральности вершин. 
+
+#### Центральность по степени
+Для начала посчитаем **центральность по степени**:
+```{r}
+deg <- degree(net)
+
+# plot(net, vertex.label=NA, layout=layout_with_fr, vertex.size=deg)
+```
+
+Теперь построим *гистограмму распределения степеней вершин*:
+```{r}
+# гистограмма степеней вершин
+hist(deg, main="Histogram of node degree", breaks=50, prob=TRUE) 
+# распределение степеней вершин
+
+mean(deg) # Средняя степень вершины по графу
+# ~ 5.66
+Mode(deg) # Модальная степень вершин графа
+# 1 -> 599 раз
+median(deg) # Медиана степеней вершин
+# ~ 2
+top_10_degree <- tail(sort(deg), 10) # топ-10 по степеням
+top_10_degree # в топе - 7 университетов, 3 гос. учреждения
+```
+
+**Вывод:**
+Центральность вершин по степени не зависит от весов. 
+Подавляющее большинство вершин имеет степень, меньшую `50`. Так, медиана кол-ва соседей равняется `r round(median(deg))`. В среднем у вершины такого графа степень равна `r round(mean(deg), 2)`. Наиболее часто встречающаяся степень вершины &mdash; 1, которая встречается 599 раз. 
+Если мы посмотрим 10 вершин с наибольшим числом соседей, то окажется, что 7 из них являются университетами, в числе которых крупнейший &mdash; университет Окленда (степень вершины максимальная &mdash; `r max(deg)`). Оставшиеся 3 организации являются государственными: 2 департамента здравоохранения и 1 исследовательская компания. Степень у всех вершин, входящих в топ-10, > 100.
+
+#### Центральность по близости
+Далее рассчитаем **центральность по близости** двумя способами:
+В первом варианте все веса ребер графа являются `1`, в другом используются обратные веса ребер.
+```{r}
+clos1 <- closeness(net, weights=NA) # Первый способ - без учета весов
+clos1
+
+plot(net, vertex.label=NA, layout=layout_with_fr, vertex.size=clos1 * 50)
+```
+
+```{r}
+top_10_clos1 <- tail(sort(clos1), 10) 
+# Вектор-топ 42 также будет единичным, а вот вектор-топ 43 уже нет
+top_10_clos1
+
+bottom_10_clos1 <- head(sort(clos1), 10)
+bottom_10_clos1
+
+clos1["University of Auckland"]
+```
+
+```{r}
+clos2 <- closeness(net)
+clos2
+
+plot(net, vertex.label=NA, layout=layout_with_fr, vertex.size=clos2 * 50)
+```
+
+```{r}
+top_10_clos2 <- tail(sort(clos2), 10) 
+top_10_clos2
+
+bottom_10_clos2 <- head(sort(clos2), 10)
+bottom_10_clos2
+
+clos2["University of Auckland"]
+```
+
+**Вывод:** В обоих случаях максимальная центральность вершин будет составлять `1`. В нашем графе существует 21 пара вершин, которая связана лишь между собой и более ни с кем (из рассчета для графа с единичными весами ребер). Из них лишь 5 организаций работали совместно более 1 раза (из рассчета для графа с обратными весами). Топ-10 центральных вершин по близости и топ-10 по степени уже существенно различаются. Так, центральность по близости университета Окленда составит `r clos1["University of Auckland"]` в первом случае и `r clos1["University of Auckland"]`. Т.е. `round(1 / clos1["University of Auckland"])` или `round(1 / clos2["University of Auckland"])` &mdash; сумма длин всех путей от университета Окленда до любой другой вершины в зависимости от метода рассчета.
+
+#### Центральность по кратчайшему пути
+```{r}
+betw1 <- betweenness(net, weights=NA)
+betw1
+
+top_10_betw1 <- tail(sort(betw1), 10)
+top_10_betw1
+
+bottom_10_betw1 <- head(sort(betw1), 10)
+bottom_10_betw1
+
+betw1["University of Auckland"]
+```
+
+```{r}
+betw2 <- betweenness(net)
+betw2
+
+top_10_betw2 <- tail(sort(betw2), 10)
+top_10_betw2
+
+bottom_10_betw2 <- head(sort(betw2), 10)
+bottom_10_betw2
+
+betw2["University of Auckland"]
+```
+
+**Вывод:** При разных методах минимальные значения центральности у вершин будут равны `0`. Это вершины, расположенные на периферии графа, или те, которые вовсе имеют всего одного соседа (например, та 21 пара вершин). Максимальные центральности вершин превышают `40 000` в топ-10. В обоих случаях университет Окленда на первом месте (`r max(betw1)` и `r max(betw2)`). Значительное число кратчайших путей между любыми двумя вершинами проходит именно через данный университет.
+
+#### Центральность по собственному значению
+```{r}
+eig1 <- eigen_centrality(net, weights = NA)
+eig1
+
+top_10_eig1 <- tail(sort(eig1$vector), 10)
+top_10_eig1
+
+bottom_10_eig1 <- head(sort(eig1$vector), 10)
+bottom_10_eig1
+```
+
+```{r}
+eig2 <- eigen_centrality(net)
+eig2
+
+top_10_eig2 <- tail(sort(eig2$vector),10)
+top_10_eig2
+
+bottom_10_eig2 <- head(sort(eig2$vector),10)
+bottom_10_eig2
+```
+
+**Вывод:** Минимальные значения центральностей по собственному значению также составляют `0`. Наибольшую же имеет университет Окленда. Его высокий показатель говорит, что сам университет связан со многими вершинами, которые в свою очередь имеют также высокое значение центральности. 
+
+#### Выводы
+```{r}
+# объединим все центральности в один датафрейм и посмотрим корреляции в двух вариантах 
+df1 <- data.frame(deg, clos1, betw1, eig1$vector)
+cor(df1)
+
+df2 <- data.frame(deg, clos2, betw2, eig2$vector)
+cor(df2)
+```
+
+**Вывод:** Составив корреляционные матрицы заметим, что существует высокая корреляция между следующими парами центральностей вершин: по степени - по кратчайшему расстоянию, по степени - по собств. значению и по собств. значению - по кратчайшему расстоянию
+
+
+Сравним, какие организации попадали в топы по центральностям (исключая центральность по близости). 
+
+```{r}
+
+corr1 <- data.frame(
+  names(top_10_degree), 
+  names(top_10_betw1), 
+  names(top_10_eig1)
+)
+corr1
+
+corr2 <- data.frame(
+  names(biggestdegree), 
+  names(biggestbetw2), 
+  names(biggesteig2)
+)
+corr2
+```
+
+**Выводы по Заданию 3:**  Сравнив топы по максимальным центральностям (за исключением топа центральностей по близости из-за малого количества соседей [порядка 1]), заметим, что по трем центральностям первую пятерку занимают одни и те же организации: университет Окленда, университет Отаго, университет Мэсси, университет Кантербери и Викторианский университет Веллингтона.
+
 
 ### Задание 4
-
-В задании 4 нам предлагается рассчитать ассортативность и гомофилию для графа. Гомофилию для классификации вершин на 4 типа мы рассчитать не можем, поэтому ...
+В *Задании 4* нам предлагается рассчитать *ассортативность* и *гомофилию* для графа.
+Начнем исследование данных с *ассортативности*:
 
 ```{r}
 # Возникли проблемы с вычислением ассортативности через
-# assortativity_nominal(net_inv, types=V(net_inv)$type, directed=F) 
+# assortativity_nominal(net, types=V(net)$type, directed=F) 
 # Предупреждение: в результате преобразования созданы NA
 # [1] NaN
-assortativity_nominal(net_inv, types=V(net_inv)$type, directed=F)
+assortativity_nominal(net, types=V(net)$type, directed=F)
 ```
 
 ```{r}
 # Поэтому было принято решение создать новый столбец с закодированными строками
 
-V(net_inv)$num_type <- ifelse( V(net_inv)$type=="Business Enterprise", 1, 
-                          ifelse( V(net_inv)$type=="Private not for profit", 2, 
-                              ifelse( V(net_inv)$type=="Government", 3, 
-                                  ifelse( V(net_inv)$type=="Higher Education", 4, 0) 
+V(net)$num_type <- ifelse( V(net)$type=="Business Enterprise", 1, 
+                          ifelse( V(net)$type=="Private not for profit", 2, 
+                              ifelse( V(net)$type=="Government", 3, 
+                                  ifelse( V(net)$type=="Higher Education", 4, 0) 
                               ) 
                           ) 
                        )
 ```
 
 ```{r}
-assort_nom <- assortativity_nominal(net_inv, types=V(net_inv)$num_type, directed=F) 
+assort_nom <- assortativity_nominal(net, types=V(net)$num_type, directed=F) 
 assort_nom # -0.05876298
 ```
 
 ```{r}
 # значение ассортативности не зависит от конкретных чисел
-V(net_inv)$num_type1 <- ifelse( V(net_inv)$type=="Business Enterprise", 2, 
-                           ifelse( V(net_inv)$type=="Private not for profit", 7, 
-                               ifelse( V(net_inv)$type=="Government", 5, 
-                                  ifelse( V(net_inv)$type=="Higher Education", 10, 0) 
+V(net)$num_type1 <- ifelse( V(net)$type=="Business Enterprise", 2, 
+                           ifelse( V(net)$type=="Private not for profit", 7, 
+                               ifelse( V(net)$type=="Government", 5, 
+                                  ifelse( V(net)$type=="Higher Education", 10, 0) 
                                ) 
                            ) 
                         )
 ```
 
 ```{r}
-assortativity_nominal(net_inv, types=V(net_inv)$num_type1, directed=F) # -0.05876298
+assortativity_nominal(net, types=V(net)$num_type1, directed=F) # -0.05876298
 ```
 
 ```{r}
 # считаем ассортативность по степени вершины
-assort_deg <- assortativity_degree(net_inv, directed=F) # -0.3361749
+assort_deg <- assortativity_degree(net, directed=F) # -0.3361749
 assort_deg
 ```
 
-**Обобщение результатов:** Ассортативность в графе по типу вершин примерно равна `r round(assort_nom, 3)`. Это означает, что мы не можем утверждать наличие предпочтительного присоединения узлов сети по типу.
+**Обобщение результатов:** *Ассортативность* в графе по типу вершин примерно равна `r round(assort_nom, 3)`. Это означает, что мы не можем утверждать наличие предпочтительного присоединения узлов сети к своему типу (среди узлов в общем, т.е. среди узлов всех типов).
 
-Ассортативность по степени вершины составляет примерно `r round(assort_deg, 3)`, что говорит о предпочтительном присоединении узлов к вершинам с относительно небольшим количеством соседей.
+*Ассортативность* по степени вершины составляет примерно `r round(assort_deg, 3)`, что говорит о предпочтительном присоединении узлов к вершинам с относительно небольшим количеством соседей.
 
+Для выявления более точного эффекта предпочтительного присоединения именно среди университетов (что интересует нас в рамках исследовательского вопроса) рассчитаем показатли гомофилии для университетов и других типов институтов.
+
+Нами было принято решение рассчитать *dyadicity* (ее посчитаем только для одного случая, т.к. она не будет меняться при различных разбиениях) и *heterophilicity* учреждений высшего образования для следующих разделений на подгруппы:
+- `Higher Education` vs все остальные
+- `Higher Education` vs `Business Enterprise`
+- `Higher Education` vs `Government`. 
+
+<ins>Замечание:</ins> Влиянием `Private not for profit` можно пренебречь. 
+
+#### `Higher Education` vs все остальные
 ```{r}
-p <- edge_density(net_inv)
+p <- edge_density(net)
 p # 0.003745601
-n_c <- sum( V(net_inv)$type == 'Higher Education' )
+n_c <- sum( V(net)$type == 'Higher Education' )
 n_c # 54
 exp_diad_uni <- n_c * (n_c - 1) / 2 * p
 exp_diad_uni # 5.359955
 
-unis <- V(net_inv)[which( V(net_inv)$type == 'Higher Education' )]
+unis <- V(net)[which( V(net)$type == 'Higher Education' )]
 unis <- names(unis)
-unis
+# unis
 
 m_c <- 0
 
-for (row in 1:nrow(edges_inv)) {
-  from_obj <- edges_inv[row, 'from']
-  to_obj <- edges_inv[row, 'to']
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
   
   if ( (from_obj %in% unis) && (to_obj %in% unis) ) {
     m_c <- m_c + 1
@@ -166,9 +600,24 @@ diadicity_uni # 32.08982
 ```
 
 ```{r}
+# 2-й способ посчитать dyadicity
+uni_net <- induced_subgraph( 
+  net, 
+  v=V(net)[which( V(net)$type == 'Higher Education' )] 
+)
+# uni_net
+# V(uni_net)$type # проверяем, что все вершины в новом графе вузы
+
+edge_density(net) # 0.003745601
+edge_density(uni_net) # 0.1201957
+
+edge_density(uni_net) / edge_density(net) # 32.08982
+```
+
+```{r}
 n_c # 54
 p # 0.003745601
-n_nc <- sum( V(net_inv)$type != 'Higher Education' )
+n_nc <- sum( V(net)$type != 'Higher Education' )
 n_nc # 1457
 
 exp_hetero_uni <- n_nc * n_c * p
@@ -176,9 +625,9 @@ exp_hetero_uni # 294.6964
 
 m_mixed <- 0
 
-for (row in 1:nrow(edges_inv)) {
-  from_obj <- edges_inv[row, 'from']
-  to_obj <- edges_inv[row, 'to']
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
   
   if ( (from_obj %in% unis) && !(to_obj %in% unis) ) {
     m_mixed <- m_mixed + 1
@@ -194,21 +643,157 @@ heterophilicity_uni <- m_mixed / exp_hetero_uni
 heterophilicity_uni # 6.959706
 ```
 
-Выводы по Заданию 4: ...
+#### `Higher Education` vs `Business Enterprise`
+```{r}
+# uni_biz_net <- induced_subgraph( 
+#   net, 
+#   v=V(net)[which( 
+#     (V(net)$type == 'Higher Education') || (V(net)$type == 'Business Enterprise') 
+#       )] 
+# )
+uni_biz_net <- induced_subgraph( 
+  net, 
+  v=V(net)[which( V(net)$type %in% c('Higher Education', 'Business Enterprise') )] 
+)
+# uni_biz_net
+# V(uni_biz_net)$type
+
+uni_wout_biz_net <- induced_subgraph( 
+  uni_biz_net, 
+  v=V(uni_biz_net)[which( V(uni_biz_net)$type == 'Higher Education' )] 
+)
+# uni_wout_biz_net
+# V(uni_wout_biz_net)$type
+
+
+p_uni_vs_biz <- edge_density(uni_biz_net)
+p_uni_vs_biz # 0.003036165
+edge_density(uni_wout_biz_net) # 0.1201957
+
+dyadicity_uni_vs_biz <- edge_density(uni_wout_biz_net) / p_uni_vs_biz 
+dyadicity_uni_vs_biz # 39.58799
+```
+
+```{r}
+n_c # 54
+p_uni_vs_biz # 0.003036165
+n_nc_biz <- sum( V(net)$type == 'Business Enterprise' )
+n_nc_biz # 1010
+
+exp_hetero_uni_vs_biz <- n_nc_biz * n_c * p_uni_vs_biz
+exp_hetero_uni_vs_biz # 165.5925
+
+biz <- V(net)[which( V(net)$type == 'Business Enterprise' )]
+biz <- names(biz)
+# biz
+
+m_mixed_vs_biz <- 0
+
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
+  
+  if ( (from_obj %in% unis) && (to_obj %in% biz) ) {
+    m_mixed_vs_biz <- m_mixed_vs_biz + 1
+  }
+  if ( (from_obj %in% biz) && (to_obj %in% unis) ) {
+    m_mixed_vs_biz <- m_mixed_vs_biz + 1
+  }
+}
+
+m_mixed_vs_biz # 1139
+
+heterophilicity_uni_vs_biz <- m_mixed_vs_biz / exp_hetero_uni_vs_biz
+heterophilicity_uni_vs_biz # 6.878333
+```
+
+#### `Higher Education` vs `Government`
+```{r}
+uni_gov_net <- induced_subgraph( 
+  net, 
+  v=V(net)[which( V(net)$type %in% c('Higher Education', 'Government') )] 
+)
+# V(uni_gov_net)$type
+
+uni_wout_gov_net <- induced_subgraph( 
+  uni_gov_net, 
+  v=V(uni_gov_net)[which( V(uni_gov_net)$type == 'Higher Education' )] 
+)
+# V(uni_wout_gov_net)$type
+
+
+p_uni_vs_gov <- edge_density(uni_gov_net) 
+p_uni_vs_gov # 0.04231381
+edge_density(uni_wout_gov_net) # 0.1201957
+
+dyadicity_uni_vs_gov <- edge_density(uni_wout_gov_net) / p_uni_vs_gov 
+dyadicity_uni_vs_gov # 2.840578
+```
+
+```{r}
+n_c # 54
+p_uni_vs_gov # 0.04231381
+n_nc_gov <- sum( V(net)$type == 'Business Enterprise' )
+n_nc_gov # 1010
+
+exp_hetero_uni_vs_gov <- n_nc_gov * n_c * p_uni_vs_gov
+exp_hetero_uni_vs_gov # 2307.795
+
+gov <- V(net)[which( V(net)$type == 'Business Enterprise' )]
+gov <- names(gov)
+# gov
+
+m_mixed_vs_gov <- 0
+
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
+  
+  if ( (from_obj %in% unis) && (to_obj %in% gov) ) {
+    m_mixed_vs_gov <- m_mixed_vs_gov + 1
+  }
+  if ( (from_obj %in% gov) && (to_obj %in% unis) ) {
+    m_mixed_vs_gov <- m_mixed_vs_gov + 1
+  }
+}
+
+m_mixed_vs_gov # 0.4935447
+
+heterophilicity_uni_vs_gov <- m_mixed_vs_gov / exp_hetero_uni_vs_gov
+heterophilicity_uni_vs_gov # 0.4935447
+```
+
+Соберем полученные значения *dyadicity* и *heterophilicity* вместе:
+- `Higher Education` vs все остальные:
+  - dyadicity: `r diadicity_uni # 32.08982`
+  - heterophilicity: `r heterophilicity_uni # 6.959706`
+- `Higher Education` vs `Business Enterprise`:
+  - dyadicity: `r dyadicity_uni_vs_biz # 39.58799`
+  - heterophilicity: `r heterophilicity_uni_vs_biz # 6.878333`
+- `Higher Education` vs `Government`:
+  - dyadicity: `r dyadicity_uni_vs_gov # 2.840578`
+  - heterophilicity: `r heterophilicity_uni_vs_gov # 0.4935447`.
+
+Мы видим, что dyadicity университетов при разделении на университеты и всех остальных (а также при разделении на университеты и бизнес) очень высокая. При этом heterophilicity также доволльно сильно превышает 1. 
+
+В чем может быть объяснение этой особенности данных? Как утверждается в статье ["Functional dyadicity and heterophilicity of gene-gene interactions in statistical epistasis networks"](https://biodatamining.biomedcentral.com/articles/10.1186/s13040-015-0062-4), описанный выше факт может быть связан с тем, что вершины со значением метки `1` имеют большую центральность $\Rightarrow$ хорошо связаны друг с другом и с вершинами другого типа. 
+
+В *Задании 6* мы будем проверять гипотезу касательно высоких степеней вершин типа `Higher Education` среди крупных университетов. 
+
+#### Выводы
+**Выводы по Заданию 4:** Мы получили, что несмотря на плотные связи учреждений высшего образования между собой, по крайней мере некоторые из них имеют также прочные связи с другими типами организаций (в частности с бизнесом). 
+
 
 ### Задание 5
-
 Проведем процедуру кластеризации вершин при помощи Edge-betweenness и Fast-greedy методов и сравним полученные результаты с существующей классификацией.
 
-Т.к. считать кратчайший путь для исходных весов ребер является не очень осмысленным, модифицируем исходный граф, заменив веса ребер на обратные им величины (см. `net_inv` в начале файла).
+Т.к. считать кратчайший путь для исходных весов ребер является не очень осмысленным, используем обратные для исходных веса ребер.
 
-Замечание 1: Для Fast-greedy не важно, какие данные использовать: исходные или инвертированные, т.к. этот метод не учитывает веса ребер (только их количество).
-
-Замечание 2: Кратчайший путь и кратчайшее расстояние в данной задаче будут представлять собой не то же самое, что и в задаче с издержками перевозок или длинами расстояний между вершинами в качестве весов ребер.
+Замечание: Для Fast-greedy не важно, какие данные использовать: исходные или инвертированные, т.к. этот метод не учитывает веса ребер (только их количество).
 
 ```{r}
 # проводим кластеризацию при помощи метода Edge-betweenness
-ceb <- cluster_edge_betweenness(net_inv, weights=E(net_inv)$weight)
+ceb <- cluster_edge_betweenness(net, weights=E(net)$weight)
 
 # смотрим на полученные в результате кластеризации объекты
 mbship_ceb <- membership(ceb) 
@@ -245,18 +830,18 @@ ms_ceb # 0.527262
 
 ```{r}
 plot(
-  ceb, net_inv, 
+  ceb, net, 
   vertex.label=NA, 
-  vertex.color=V(net_inv)$color, 
+  vertex.color=V(net)$color, 
   layout=layout_nicely
 )
 ```
 
 ```{r}
 plot(
-  ceb, net_inv, 
+  ceb, net, 
   vertex.label=NA, 
-  vertex.color=V(net_inv)$color, 
+  vertex.color=V(net)$color, 
   layout=layout_with_lgl
 )
 ```
@@ -264,7 +849,7 @@ plot(
 **Сравним результаты кластеризации Edge-betweenness и имеющуюся классификацию вершин:**
 
 ```{r}
-compare(ceb, V(net_inv)$type, method='nmi') # 
+compare(ceb, V(net)$type, method='nmi') # 
 # здесь и далее мы используем нормализованное значение функции compare() для облегчения интерпретации возвращаемого результата
 ```
 
@@ -272,7 +857,7 @@ compare(ceb, V(net_inv)$type, method='nmi') #
 
 ```{r}
 # проводим кластеризацию при помощи метода Fast-greedy
-cfg <- cluster_fast_greedy(net_inv, weights=E(net_inv)$weight) 
+cfg <- cluster_fast_greedy(net, weights=E(net)$weight) 
 
 # смотрим на полученные в результате кластеризации объекты
 mbship_cfg <- membership(cfg) 
@@ -309,26 +894,27 @@ ms_cfg # 0.5310055
 
 ```{r}
 plot(
-  cfg, net_inv, 
+  cfg, net, 
   vertex.label=NA, 
-  vertex.color=V(net_inv)$color, 
+  vertex.color=V(net)$color, 
   layout=layout_nicely
 )
 ```
 
 ```{r}
 plot(
-  cfg, net_inv, 
+  cfg, net, 
   vertex.label=NA, 
-  vertex.color=V(net_inv)$color, 
+  vertex.color=V(net)$color, 
   layout=layout_with_lgl
 )
 ```
 
 ```{r}
-compare(cfg, V(net_inv)$type, method='nmi') # 0.03386511
+compare(cfg, V(net)$type, method='nmi') # 0.03386511
 ```
 
 Таким образом, мы видим, что так же, как и предыдущий способ кластеризации, Fast-greedy не очень хорошо соответствует реальной классификации рассматриваемых институтов.
 
+#### Выводы
 **Вывод по Заданию 5:** Известные нам способы кластеризации (Edge-betweenness и Fast-greedy) не дали результата, похожего на имеющуюся в датасете классификацию.

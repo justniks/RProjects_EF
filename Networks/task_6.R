@@ -2,36 +2,16 @@
 # Установим рабочую директорию
 setwd("~/Documents/GitHub/RProjects_EF/Networks")
 
-
-# Подгрузим необходимые для дальнейшего анализа библиотеки
-## install.packages("igraph")
-## install.packages("igraphdata")
-## install.packages("network") 
-## install.packages("tidygraph")
-## install.packages("ggraph")
-## install.packages("visNetwork")
-## install.packages("threejs")
-## install.packages("networkD3")
-## install.packages("DigrammeR")
-
-
 library(igraph);
 library(igraphdata);
-# library(intergraph);
-library(network);
-library(tidygraph);
 library(ggraph);
-library(visNetwork);
-library(threejs);
-library(networkD3);
-# library(DigrammeR);
+library(tidygraph);
 
 
 ## Обработка данных и создание графа
 
-# Загрузим данные для исследования
+# Загрузим данные для исследования: набор ребер и вершин
 edges <- read.csv("edges_1.csv", header=T) 
-# edges <- edges[1:500, ]
 colnames(edges) <- c('from', 'to', 'type1', 'type2', 'weight')
 
 nodes <- unique(edges[c('from', 'type1')])
@@ -45,23 +25,19 @@ nodes <- unique(nodes[c('organisation', 'type')])
 rownames(nodes) <- NULL
 edges <- edges[c('from', 'to', 'weight')]
 
-# Создадим также набор обратных величин для весов ребер (это пригодится нам в дальнейшем)
-edges_inv <- edges
-edges_inv$weight <- 1 / edges_inv$weight
+# Создадим также набор обратных величин для весов ребер (это пригодится нам в дальнейшем). Исходные веса нам уже не понадобятся
+edges$weight <- 1 / edges$weight
 
 net <- graph_from_data_frame(d=edges, vertices=nodes, directed=F)
-net_inv <- graph_from_data_frame(d=edges_inv, vertices=nodes, directed=F)
-# направленный граф нужен для визуализации графа при помощи пакета ggraph
-net_directed <- graph_from_data_frame(d=edges, vertices=nodes, directed=T)
 
-V(net_inv)$color <- ifelse( V(net_inv)$type=="Business Enterprise", "red", 
-                            ifelse( V(net_inv)$type=="Private not for profit", "purple", 
-                                    ifelse( V(net_inv)$type=="Government", "green", 
-                                            ifelse( V(net_inv)$type=="Higher Education", "blue", "black") 
-                                    ) 
-                            ) 
+V(net)$color <- ifelse( V(net)$type=="Business Enterprise", "red", 
+                        ifelse( V(net)$type=="Private not for profit", "purple", 
+                                ifelse( V(net)$type=="Government", "green", 
+                                        ifelse( V(net)$type=="Higher Education", "blue", "black") 
+                                ) 
+                        ) 
 )
-head(V(net_inv)$color, 10)
+head(V(net)$color, 10)
 
 
 
@@ -73,12 +49,12 @@ head(V(net_inv)$color, 10)
 # далее делаем некоторые вершины unknown (кроме супер популярных / супер центральных) 
 # и хотим построить предсказательную модель для предсказания типа вершины, которая изначально unknown
 
-# p <- edge_density(net_inv)
-# n_c <- sum( V(net_inv)$type == 'Higher Education' )
+# p <- edge_density(net)
+# n_c <- sum( V(net)$type == 'Higher Education' )
 # exp_diad_uni <- n_c * (n_c - 1) / 2 * p
 # 
 # m_c <- 0
-# for (e in edges_inv) {
+# for (e in edges) {
 #   if (e$from == 'Higher Education' && e$to == 'Higher Education') {
 #     m_c <- m_c + 1
 #   }
@@ -90,12 +66,12 @@ head(V(net_inv)$color, 10)
 
 ####
 
-# n_nc <- sum( V(net_inv)$type != 'Higher Education' )
+# n_nc <- sum( V(net)$type != 'Higher Education' )
 # 
 # exp_hetero_uni <- n_nc * n_c * p
 # 
 # m_mixed <- 0
-# for (e in edges_inv) {
+# for (e in edges) {
 #   if (e$from == 'Higher Education' && e$to != 'Higher Education') {
 #     m_mixed <- m_mixed + 1
 #   }
@@ -107,23 +83,23 @@ head(V(net_inv)$color, 10)
 # heterophilicity_uni <- m_mixed / exp_hetero_uni # ?
 
 
-# for (e in edges_inv) {
+# for (e in edges) {
 #   if (e['from'] == 'Higher Education') {
 #     print(e$from)
 #   }
 # }
 # 
-# for (e in edges_inv) {
+# for (e in edges) {
 #   print( class(e['from']) )
 # }
 # 
-# class( edges_inv['from'] )
+# class( edges['from'] )
 # 
-# edges_inv['from']
+# edges['from']
 
-# for (row in 1:nrow(edges_inv)) {
-#   from_obj <- edges_inv[row, 'from']
-#   to_obj <- edges_inv[row, 'to']
+# for (row in 1:nrow(edges)) {
+#   from_obj <- edges[row, 'from']
+#   to_obj <- edges[row, 'to']
 #   
 #   print(from_obj)
 #   print(to_obj)
@@ -134,41 +110,41 @@ head(V(net_inv)$color, 10)
 # from_obj
 # to_obj
 # 
-# class(V(net_inv))
-# head(V(net_inv), 10)
+# class(V(net))
+# head(V(net), 10)
 # 
-# unis <- V(net_inv)[which( V(net_inv)$type == 'Higher Education' )]
+# unis <- V(net)[which( V(net)$type == 'Higher Education' )]
 # unis
 # 
 # length(unis)
-# sum( V(net_inv)$type == 'Higher Education' )
+# sum( V(net)$type == 'Higher Education' )
 
 
 ############################### НАЧАЛО
-p <- edge_density(net_inv)
+p <- edge_density(net)
 p # 0.003745601
-n_c <- sum( V(net_inv)$type == 'Higher Education' )
+n_c <- sum( V(net)$type == 'Higher Education' )
 n_c # 54
 exp_diad_uni <- n_c * (n_c - 1) / 2 * p
 exp_diad_uni # 5.359955
 
 # m_c <- 0
-# for (e in edges_inv) {
+# for (e in edges) {
 #   if (e$from == 'Higher Education' && e$to == 'Higher Education') {
 #     m_c <- m_c + 1
 #   }
 # }
 
 
-unis <- V(net_inv)[which( V(net_inv)$type == 'Higher Education' )]
+unis <- V(net)[which( V(net)$type == 'Higher Education' )]
 unis <- names(unis)
 unis
 
 m_c <- 0
 
-for (row in 1:nrow(edges_inv)) {
-  from_obj <- edges_inv[row, 'from']
-  to_obj <- edges_inv[row, 'to']
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
   
   if ( (from_obj %in% unis) && (to_obj %in% unis) ) {
     m_c <- m_c + 1
@@ -188,7 +164,7 @@ diadicity_uni # 32.08982
 
 # head(nodes, 20)
 # 
-# head( V(net_inv)$type )
+# head( V(net)$type )
 # unis
 # 
 # 'Ako Aotearoa National Centre for Tertiary Teaching Excellence' %in% unis
@@ -201,16 +177,16 @@ diadicity_uni # 32.08982
 
 n_c # 54
 p # 0.003745601
-n_nc <- sum( V(net_inv)$type != 'Higher Education' )
+n_nc <- sum( V(net)$type != 'Higher Education' )
 
 exp_hetero_uni <- n_nc * n_c * p
 exp_hetero_uni # 294.6964
 
 m_mixed <- 0
 
-for (row in 1:nrow(edges_inv)) {
-  from_obj <- edges_inv[row, 'from']
-  to_obj <- edges_inv[row, 'to']
+for (row in 1:nrow(edges)) {
+  from_obj <- edges[row, 'from']
+  to_obj <- edges[row, 'to']
   
   if ( (from_obj %in% unis) && !(to_obj %in% unis) ) {
     m_mixed <- m_mixed + 1
@@ -224,6 +200,19 @@ m_mixed # 2051
 heterophilicity_uni <- m_mixed / exp_hetero_uni # ?
 heterophilicity_uni # 6.959706
 
-n_nc
+n_nc # 1457
 
 ############################### КОНЕЦ
+
+
+uni_net <- induced_subgraph(net, v = V(net)[which(V(net)$type == 'Higher Education')])
+uni_net
+V(uni_net)$type # проверяем, что все вершины в новом графе churn = 1
+edge_density(net) # 0.003745601
+edge_density(uni_net) # 0.1201957
+
+edge_density(uni_net) / edge_density(net) # 32.08982
+
+net
+
+## net[which( V(net)$type == 'Higher Educattion' )]
