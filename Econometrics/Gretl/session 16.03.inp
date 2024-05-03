@@ -1,0 +1,21 @@
+# Запись истории команд начата 2023-03-16 16:50
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/ef.xlsx
+# модель 1
+ols Y 0 D
+# модель 2
+ols Y 0 D EF
+reset
+reset --squares-only
+series EF_D = EF*D
+# модель 3
+ols Y 0 D EF EF_D
+vif
+bkw
+coeffsum  D EF_D
+logs Y
+# модель 4
+ols l_Y 0 D EF EF_D
+coeffsum  D EF
+coeffsum  D EF_D
