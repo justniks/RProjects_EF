@@ -1,0 +1,22 @@
+# Запись истории команд начата 2023-04-27 18:27
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Guns.xls
+setobs stateid year --panel-vars
+logs vio
+# модель 1
+panel l_vio 0 shall --pooled
+# модель 2
+panel l_vio 0 shall avginc density incarc_rate pb1064 pw1064 pm1029 pop \
+  --pooled
+# модель 3
+panel l_vio 0 shall avginc density incarc_rate pb1064 pw1064 pm1029 pop \
+  --pooled --robust
+# модель 4
+panel l_vio 0 shall --pooled --robust
+# модель 5
+panel l_vio 0 shall incarc_rate pb1064 pw1064 pop avginc density pm1029 \
+  --robust
+# модель 6
+panel l_vio 0 shall incarc_rate pb1064 pw1064 pop avginc density pm1029 \
+  --time-dummies --robust
