@@ -1,0 +1,29 @@
+# Запись истории команд начата 2023-06-04 12:05
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Fuel_new.gdt
+summary okpo
+summary okonh
+summary year
+summary rout
+summary emp
+summary wor
+summary rk
+# модель 1
+panel ly 0 ll lk --pooled --robust
+restrict
+b[ll] + b[lk] = 1
+end restrict
+coeffsum  ll lk
+# модель 2
+panel ly 0 ll lk --robust
+restrict
+b[ll] + b[lk] = 1
+end restrict
+# модель 3
+panel ly 0 ll lk --robust --random-effects
+restrict
+b[ll] + b[lk] = 1
+end restrict
+# модель 4
+panel ly 0 ll lk --time-dummies --robust
