@@ -1,0 +1,11 @@
+# Запись истории команд начата 2023-03-31 23:03
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Agriculture.xlsx
+# модель 1
+ols PRODP 0 FUNG1 FUNG2 GIRB YDOB1 YDOB2 INSEC LABOUR
+modtest --white
+# модель 2
+ols PRODP 0 FUNG1 FUNG2 GIRB YDOB1 YDOB2 INSEC LABOUR --robust
+# модель 3
+hsk PRODP 0 FUNG1 FUNG2 GIRB YDOB1 YDOB2 INSEC LABOUR
