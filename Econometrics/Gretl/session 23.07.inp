@@ -1,0 +1,24 @@
+# Запись истории команд начата 2023-07-23 16:58
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Downloads/AI_Masters_dataset.csv
+# модель 1
+ols price 0 feat1 feat2 feat3
+reset
+reset --squares-only
+modtest --squares
+modtest --logs
+square feat1 feat2 feat3
+feat12 = feat1 * feat2
+feat13 = feat1 * feat3
+feat23 = feat2 * feat3
+# модель 2
+ols price 0 feat1 feat2 feat3 sq_feat1 sq_feat2 sq_feat3 feat12 feat13 \
+  feat23
+logs feat1 feat2 feat3 price
+# модель 3
+ols l_price 0 l_feat1 l_feat2 l_feat3
+# модель 4
+ols l_price 0 feat1 feat2 feat3
+# модель 5
+ols price 0 l_feat1 l_feat2 l_feat3
