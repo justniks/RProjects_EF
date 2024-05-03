@@ -1,0 +1,11 @@
+# Запись истории команд начата 2023-05-04 15:49
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Downloads/lect03.xlsx
+logs exam
+# модель 1
+ols l_exam 0 lect --robust
+# модель 2
+tsls l_exam 0 lect female ; 0 d friday female --robust
+# модель 3
+ols lect 0 female friday d --robust
