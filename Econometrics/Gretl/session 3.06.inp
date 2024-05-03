@@ -1,0 +1,26 @@
+# Запись истории команд начата 2023-06-03 17:48
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/choice_adj.csv
+# модель 1
+ols SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB
+# модель 2
+logit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --p-values
+# модель 3
+ols SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --robust
+# модель 4
+logit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --p-values \
+  --robust
+# модель 5
+logit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --robust
+# модель 6
+probit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --p-values \
+  --robust
+# модель 7
+probit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --robust
+# модель 8
+logit SCHOOL 0 ABLE7 CTRATIO ETOT FEMALE LOGINC OLDSIB YNGSIB --p-values \
+  --robust
+restrict
+b[OLDSIB] - b[YNGSIB] = 0
+end restrict
