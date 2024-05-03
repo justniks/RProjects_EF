@@ -1,0 +1,8 @@
+# Запись истории команд начата 2023-06-06 12:41
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Vaccination.xlsx
+# модель 1
+tsls Disease 0 Vaccination ; 0 Z --robust
+# модель 2
+ols Disease 0 Z --robust
