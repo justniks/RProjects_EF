@@ -1,0 +1,19 @@
+# Запись истории команд начата 2023-04-27 16:01
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Acemoglu.dta
+gnuplot  lgdp prot
+# модель 1
+ols lgdp 0 prot --robust
+# модель 2
+ols lgdp 0 prot latitude --robust
+# модель 3
+ols lgdp 0 logmort
+# модель 4
+ols lgdp 0 logmort --robust
+# модель 5
+tsls lgdp 0 prot ; 0 logmort --robust
+# модель 6
+ols prot 0 logmort --robust
+# модель 7
+tsls lgdp 0 latitude prot ; 0 logmort latitude --robust
