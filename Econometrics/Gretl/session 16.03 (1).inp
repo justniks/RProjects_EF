@@ -1,0 +1,14 @@
+# Запись истории команд начата 2023-03-16 17:52
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Training.xlsx
+# модель 1
+ols sales 0 training female experience capital IQ
+# модель 2
+ols sales 0 training female experience capital IQ --robust
+series tr_cap = training*capital
+# модель 3
+ols sales 0 training female experience IQ tr_cap
+logs sales
+# модель 4
+ols l_sales 0 training female experience IQ capital
