@@ -1,0 +1,18 @@
+# Запись истории команд начата 2023-03-22 22:00
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/CollegeDistance.xls
+corr cue80 dist ed
+# модель 1
+ols ed 0 cue80 dist
+# модель 2
+ols ed 0 dist female bytest tuition black hispanic incomehi ownhome \
+  dadcoll momcoll cue80 stwmfg80
+# модель 3
+ols ed 0 dist female bytest tuition black hispanic incomehi ownhome \
+  dadcoll momcoll cue80 stwmfg80
+omit female bytest tuition black hispanic incomehi ownhome dadcoll \
+  momcoll stwmfg80
+omit female bytest tuition black hispanic incomehi ownhome dadcoll \
+  momcoll stwmfg80 --test-only
+reset
