@@ -1,0 +1,9 @@
+# Запись истории команд начата 2023-06-03 22:43
+# Запись истории команд текущей сессии.  Учтите, что для запуска
+# этих команд в скрипте, возможно, придется внести некоторые изменения.
+open /Users/nikitasysoev/Documents/gretl/Westeros.xlsx
+setobs Region Year --panel-vars
+# модель 1
+panel Y 0 X
+# модель 2
+panel Y 0 X --robust
