@@ -30,8 +30,10 @@ summary(m2_1) # фиксированные эффекты могли съест�
 # фиксированные эффекты борются со всеми пропущенными переменными
 # но не спасают от эндогенности из-за двусторонней причинно-следственной связи
 
-m3 <- ivreg(logit_delta ~ price_per_serving + mushy + 
-              sugar | price_instrument + mushy + sugar, data=data)
+m3 <- ivreg(
+  logit_delta ~ price_per_serving + mushy + sugar | price_instrument + mushy + sugar, 
+  data=data
+)
 summary(m3)
 
 stargazer(m1, m2_1, m3, type='text')
@@ -45,9 +47,18 @@ for (i in 1:nrow(data)){
   data$hausman[i] <- mean(subdf$price_per_serving)
 }
 
-m4 <- ivreg(logit_delta ~ price_per_serving + mushy + 
-              sugar | hausman + mushy + sugar, data=data)
+m4 <- ivreg(
+  logit_delta ~ price_per_serving + mushy + sugar | hausman + mushy + sugar, 
+  data=data
+)
 summary(m4)
 
-ggplot(data, aes(x=data$price_per_serving, y=data$price_instrument)) + geom_point()
-ggplot(data, aes(x=data$price_per_serving, y=data$hausman)) + geom_point()
+ggplot(
+  data, 
+  aes(x=data$price_per_serving, y=data$price_instrument)
+) + geom_point()
+
+ggplot(
+  data, 
+  aes(x=data$price_per_serving, y=data$hausman)
+) + geom_point()
